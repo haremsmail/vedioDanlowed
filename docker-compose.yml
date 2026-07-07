@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: video-downloader-app
+    restart: always
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./storage:/app/storage
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      - APP_ENV=${APP_ENV}
+      - APP_DEBUG=${APP_DEBUG}
+      - APP_URL=${APP_URL}
+    networks:
+      - video-network
+
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: video-downloader-queue
+    restart: always
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./storage:/app/storage
+    environment:
+      - APP_ENV=${APP_ENV}
+      - APP_DEBUG=${APP_DEBUG}
+    command: php artisan queue:work --tries=3 --timeout=3600
+    networks:
+      - video-network
+
+networks:
+  video-network:
+    driver: bridge
