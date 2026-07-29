@@ -9,33 +9,40 @@ services:
     restart: always
     working_dir: /app
     volumes:
-      - ./:/app
       - ./storage:/app/storage
     ports:
       - "${APP_PORT:-8000}:8000"
+    depends_on:
+      - db
     environment:
-      - APP_ENV=${APP_ENV}
-      - APP_DEBUG=${APP_DEBUG}
-      - APP_URL=${APP_URL}
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_URL=${APP_URL:-http://localhost:8000}
+      - APP_KEY=${APP_KEY}
+      - DB_CONNECTION=pgsql
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=videodl
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=secret
     networks:
       - video-network
 
-  queue:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: video-downloader-queue
+  db:
+    image: postgres:15-alpine
+    container_name: video-downloader-db
     restart: always
-    working_dir: /app
-    volumes:
-      - ./:/app
-      - ./storage:/app/storage
     environment:
-      - APP_ENV=${APP_ENV}
-      - APP_DEBUG=${APP_DEBUG}
-    command: php artisan queue:work --tries=3 --timeout=3600
+      - POSTGRES_DB=videodl
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secret
+    volumes:
+      - db_data:/var/lib/postgresql/data
     networks:
       - video-network
+
+volumes:
+  db_data:
 
 networks:
   video-network:

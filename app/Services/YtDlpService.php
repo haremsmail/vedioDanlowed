@@ -70,8 +70,8 @@ class YtDlpService
      */
     private function findFfmpeg(): string
     {
-        // Check env first
-        $envPath = env('FFMPEG_PATH');
+        // Check config first
+        $envPath = config('ytdlp.ffmpeg_path');
         if ($envPath && file_exists($envPath . DIRECTORY_SEPARATOR . 'ffmpeg' . (PHP_OS_FAMILY === 'Windows' ? '.exe' : ''))) {
             return $envPath;
         }

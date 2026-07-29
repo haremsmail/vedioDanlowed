@@ -1,4 +1,4 @@
-FROM php:8.1-fpm
+FROM php:8.2-cli
 
 # Set working directory
 WORKDIR /app
@@ -9,43 +9,60 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
-    locales \
+    libpq-dev \
+    libsqlite3-dev \
+    libzip-dev \
     zip \
-    jpegoptim \
-    optipng \
-    pngquant \
-    gifsicle \
-    vim \
     unzip \
     git \
     curl \
-    yt-dlp \
-    python3-pip
+    ffmpeg \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install yt-dlp (latest version via pip)
+RUN python3 -m venv /opt/ytdlp-venv \
+    && /opt/ytdlp-venv/bin/pip install --no-cache-dir yt-dlp \
+    && ln -s /opt/ytdlp-venv/bin/yt-dlp /usr/local/bin/yt-dlp
 
 # Install PHP extensions
-RUN docker-php-ext-install -j$(nproc) iconv gd mbstring pdo pdo_sqlite bcmath ctype fileinfo
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) \
+        gd \
+        pdo_sqlite \
+        pdo_pgsql \
+        pdo_mysql \
+        bcmath \
+        zip \
+        opcache
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set locale
-RUN sed -i -e 's/# ku_IQ.UTF-8 UTF-8/ku_IQ.UTF-8 UTF-8/' /etc/locale.gen && \
-    dpkg-reconfigure --frontend=noninteractive locales
-
-# Copy project
+# Copy project files
 COPY . .
 
-# Install dependencies
-RUN composer install --no-interaction --optimize-autoloader
+# Install PHP dependencies (no dev dependencies for production)
+RUN composer install --no-interaction --optimize-autoloader --no-dev
+
+# Create required storage directories
+RUN mkdir -p storage/framework/{cache/data,sessions,views,testing} \
+    && mkdir -p storage/logs \
+    && mkdir -p storage/downloads \
+    && mkdir -p bootstrap/cache \
+    && mkdir -p database
 
 # Set permissions
-RUN chown -R www-data:www-data /app/storage /app/bootstrap/cache
+RUN chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/database \
+    && chmod -R 775 /app/storage /app/bootstrap/cache
 
-# Expose port
+# Make entrypoint executable
+RUN chmod +x docker-entrypoint.sh
+
+# Expose port (Render uses PORT env variable)
 EXPOSE 8000
 
-# Run artisan serve
-CMD ["php", "artisan", "serve", "--host=0.0.0.0"]
+# Run entrypoint script
+CMD ["./docker-entrypoint.sh"]

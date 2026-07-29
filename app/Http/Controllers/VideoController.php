@@ -72,7 +72,7 @@ class VideoController extends Controller
             ]);
             
             // Generic error message in production
-            $message = env('APP_DEBUG')
+            $message = config('app.debug')
                 ? $e->getMessage()
                 : __('messages.video_fetch_failed');
             
@@ -134,7 +134,7 @@ class VideoController extends Controller
             ]);
             
             // Generic error message in production
-            $message = env('APP_DEBUG')
+            $message = config('app.debug')
                 ? $e->getMessage()
                 : __('messages.download_failed');
             

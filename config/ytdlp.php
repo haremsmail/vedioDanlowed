@@ -57,6 +57,12 @@ return [
     /*
      * API Tokens for external API consumers
      */
+    /*
+     * Path to ffmpeg binary directory.
+     * Leave empty to auto-detect or use PATH.
+     */
+    'ffmpeg_path' => env('FFMPEG_PATH', ''),
+
     'api_token' => env('API_TOKEN'),
     'api_token_secondary' => env('API_TOKEN_SECONDARY'),
 ];

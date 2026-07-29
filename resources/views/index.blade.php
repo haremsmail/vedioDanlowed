@@ -557,9 +557,7 @@
                 </button>
             </div>
         </div>
-
     </div>
-
     <!-- FOOTER -->
     <div class="footer">
         <p>{{ __('messages.footer_text') }}</p>
@@ -584,7 +582,7 @@
         $('alert' + cap + 'Text').textContent = msg;
         $('alert' + cap).classList.add('show');
         if (type !== 'error') {
-            setTimeout(() => $('alert' + cap)classList.remove('show'), 6000);
+            setTimeout(() => $('alert' + cap).classList.remove('show'), 6000);
         }
     }
     function clearAlerts() {
