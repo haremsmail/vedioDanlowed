@@ -10,10 +10,22 @@ mkdir -p /app/storage/downloads
 mkdir -p /app/bootstrap/cache
 
 # Set permissions
-chown -R www-data:www-data /app/storage /app/bootstrap/cache
+chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/database
 chmod -R 775 /app/storage /app/bootstrap/cache
 
-# Note: PostgreSQL database will be managed by the db container or Render managed DB
+# Generate APP_KEY if not set or not in Laravel base64 format
+if [ -z "$APP_KEY" ] || [[ "$APP_KEY" != base64:* ]]; then
+    echo "🔑 Generating Laravel APP_KEY..."
+    php artisan key:generate --force --no-interaction
+fi
+
+# Create SQLite database if using sqlite driver
+if [ "$DB_CONNECTION" = "sqlite" ] || [ -z "$DB_CONNECTION" ]; then
+    if [ ! -f /app/database/database.sqlite ]; then
+        touch /app/database/database.sqlite
+        chown www-data:www-data /app/database/database.sqlite
+    fi
+fi
 
 # Cache config for performance
 php artisan config:cache 2>/dev/null || true
