@@ -16,11 +16,9 @@ services:
       - key: APP_URL
         sync: false
       - key: DB_CONNECTION
-        value: pgsql
-      - key: DATABASE_URL
-        fromDatabase:
-          name: savetube-db
-          property: connectionString
+        value: sqlite
+      - key: DB_DATABASE
+        value: /app/database/database.sqlite
       - key: LOG_CHANNEL
         value: stderr
       - key: LOG_LEVEL
@@ -35,8 +33,3 @@ services:
         value: "60"
       - key: RATE_LIMIT_PERIOD
         value: "60"
-
-databases:
-  - name: savetube-db
-    databaseName: savetube
-    plan: free
