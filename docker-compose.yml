@@ -5,39 +5,58 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+
     container_name: video-downloader-app
     restart: always
+
     working_dir: /app
+
     volumes:
       - ./storage:/app/storage
+
     ports:
       - "${APP_PORT:-8000}:8000"
+
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
     environment:
       - APP_ENV=${APP_ENV:-local}
       - APP_DEBUG=${APP_DEBUG:-true}
       - APP_URL=${APP_URL:-http://localhost:8000}
       - APP_KEY=${APP_KEY}
+
       - DB_CONNECTION=pgsql
       - DB_HOST=db
       - DB_PORT=5432
       - DB_DATABASE=videodl
       - DB_USERNAME=postgres
       - DB_PASSWORD=secret
+
     networks:
       - video-network
 
   db:
     image: postgres:15-alpine
+
     container_name: video-downloader-db
     restart: always
+
     environment:
       - POSTGRES_DB=videodl
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=secret
+
     volumes:
       - db_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d videodl"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
     networks:
       - video-network
 

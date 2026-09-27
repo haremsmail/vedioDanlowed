@@ -29,11 +29,12 @@ storage/app/*
 !storage/app/.gitkeep
 .rnd
 
-storage/tools/
+/bootstrap/cache/*
+!/bootstrap/cache/.gitkeep
 
+storage/tools/
 # Downloads
 storage/downloads/
-
 # Logs
 storage/logs/*.log
 storage/storage/

@@ -4,4 +4,7 @@ node_modules
 storage/tools
 storage/logs
 storage/framework
+storage/downloads
+bootstrap/cache/*
+!bootstrap/cache/.gitkeep
 .env
