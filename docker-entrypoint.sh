@@ -16,6 +16,7 @@ if [ ! -f /app/.env ]; then
     echo "APP_NAME=SaveTube" > /app/.env
     echo "APP_ENV=production" >> /app/.env
     echo "APP_DEBUG=false" >> /app/.env
+    echo "APP_KEY=" >> /app/.env
     echo "DB_CONNECTION=sqlite" >> /app/.env
     echo "DB_DATABASE=/app/database/database.sqlite" >> /app/.env
     echo "LOG_CHANNEL=stderr" >> /app/.env
