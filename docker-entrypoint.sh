@@ -2,6 +2,9 @@
 
 echo "🚀 Starting SaveTube..."
 
+# Clear any stale cache from git (fixes SailServiceProvider not found)
+php artisan optimize:clear 2>/dev/null || true
+
 # Create all required directories
 mkdir -p /app/storage/framework/cache/data
 mkdir -p /app/storage/framework/sessions
