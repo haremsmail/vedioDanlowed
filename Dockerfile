@@ -41,11 +41,20 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Force cache bust for fresh build without old cached layers
+ARG CACHE_BUST=20260927-v1
+
+# Copy composer files first to guarantee clean dependency resolution
+COPY composer.json composer.lock ./
+
+# Install production dependencies directly from lock file (clean build)
+RUN composer install --no-interaction --optimize-autoloader --no-dev --no-scripts
+
 # Copy project files
 COPY . .
 
-# Install PHP dependencies (no dev dependencies for production)
-RUN composer install --no-interaction --optimize-autoloader --no-dev
+# Complete composer dump-autoload cleanly without any dev packages
+RUN composer dump-autoload --optimize --no-dev
 
 # Create required storage directories
 RUN mkdir -p storage/framework/{cache/data,sessions,views,testing} \
@@ -54,14 +63,14 @@ RUN mkdir -p storage/framework/{cache/data,sessions,views,testing} \
     && mkdir -p bootstrap/cache \
     && mkdir -p database
 
+# Fix line endings if written on Windows and ensure executable permissions
+RUN sed -i 's/\r$//' docker-entrypoint.sh \
+    && chmod +x docker-entrypoint.sh
+
 # Set permissions
-RUN chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/database \
-    && chmod -R 775 /app/storage /app/bootstrap/cache
+RUN chmod -R 777 /app/storage /app/bootstrap/cache /app/database
 
-# Make entrypoint executable
-RUN chmod +x docker-entrypoint.sh
-
-# Expose port (Render uses PORT env variable)
+# Expose port (Railway sets PORT env variable)
 EXPOSE 8000
 
 # Run entrypoint script
