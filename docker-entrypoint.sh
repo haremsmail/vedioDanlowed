@@ -1,52 +1,53 @@
 #!/bin/bash
-set -e
 
-echo "🚀 Starting Video Downloader..."
+echo "🚀 Starting SaveTube..."
 
-# Create required directories
-mkdir -p /app/storage/framework/{cache/data,sessions,views,testing}
+# Create all required directories
+mkdir -p /app/storage/framework/cache/data
+mkdir -p /app/storage/framework/sessions
+mkdir -p /app/storage/framework/views
+mkdir -p /app/storage/framework/testing
 mkdir -p /app/storage/logs
 mkdir -p /app/storage/downloads
 mkdir -p /app/bootstrap/cache
 mkdir -p /app/database
 
-# Auto-create a safe production .env file if it doesn't exist
-if [ ! -f /app/.env ]; then
-    echo "Creating safe default .env file..."
-    echo "APP_NAME=SaveTube" > /app/.env
-    echo "APP_ENV=production" >> /app/.env
-    echo "APP_DEBUG=false" >> /app/.env
-    echo "APP_KEY=" >> /app/.env
-    echo "DB_CONNECTION=sqlite" >> /app/.env
-    echo "DB_DATABASE=/app/database/database.sqlite" >> /app/.env
-    echo "LOG_CHANNEL=stderr" >> /app/.env
-    echo "SESSION_DRIVER=file" >> /app/.env
-    echo "CACHE_DRIVER=file" >> /app/.env
-fi
+# Set open permissions (Railway runs as root, no www-data needed)
+chmod -R 777 /app/storage
+chmod -R 777 /app/bootstrap/cache
+chmod -R 777 /app/database
 
-# Generate APP_KEY if missing
-if ! grep -q "APP_KEY=base64:" /app/.env; then
-    echo "🔑 Generating Laravel APP_KEY..."
-    php artisan key:generate --force --no-interaction
-fi
+# Create .env file with all required values
+cat > /app/.env << 'EOF'
+APP_NAME=SaveTube
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=
+DB_CONNECTION=sqlite
+DB_DATABASE=/app/database/database.sqlite
+LOG_CHANNEL=stderr
+LOG_LEVEL=warning
+SESSION_DRIVER=file
+CACHE_DRIVER=file
+QUEUE_CONNECTION=sync
+EOF
 
-# Create SQLite database
-if [ ! -f /app/database/database.sqlite ]; then
-    touch /app/database/database.sqlite
-fi
+# Create SQLite database file
+touch /app/database/database.sqlite
+chmod 777 /app/database/database.sqlite
 
-# Set proper permissions so web server can write
-chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/database /app/.env
-chmod -R 775 /app/storage /app/bootstrap/cache
+# Generate APP_KEY
+echo "🔑 Generating APP_KEY..."
+php artisan key:generate --force --no-interaction
 
-# Cache config for performance
-php artisan config:cache 2>/dev/null || true
-php artisan route:cache 2>/dev/null || true
-php artisan view:cache 2>/dev/null || true
+# Cache everything
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
 
 # Run migrations
 echo "🗃️ Running migrations..."
 php artisan migrate --force --no-interaction
 
-echo "✅ Ready! Starting server on port ${PORT:-8000}..."
+echo "✅ Starting on port ${PORT:-8000}..."
 exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
