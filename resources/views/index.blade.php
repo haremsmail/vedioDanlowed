@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ku" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -792,15 +792,34 @@
 
             showAlert('success', '{{ __("messages.download_ready") }}');
 
-            // Trigger browser file download
+            // Universal download: works on mobile, desktop, iOS, Android
+            const dlUrl = data.download_url;
+
+            // 1. Standard anchor click (Desktop + Android Chrome)
             const a = document.createElement('a');
-            a.href     = data.download_url;
-            a.download = data.filename || 'video';
+            a.href     = dlUrl;
+            a.download = data.filename || 'video.mp4';
+            a.target   = '_blank';
+            a.rel      = 'noopener noreferrer';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
 
-            // Re-enable button after short delay
+            // 2. Show persistent Save button for iOS Safari / Firefox mobile
+            const existingBtn = document.getElementById('fallbackDownloadBtn');
+            if (existingBtn) existingBtn.remove();
+            const fallbackBtn = document.createElement('a');
+            fallbackBtn.id        = 'fallbackDownloadBtn';
+            fallbackBtn.href      = dlUrl;
+            fallbackBtn.target    = '_blank';
+            fallbackBtn.rel       = 'noopener noreferrer';
+            fallbackBtn.download  = data.filename || 'video.mp4';
+            fallbackBtn.className = 'btn btn-success';
+            fallbackBtn.style.cssText = 'margin-top:14px;display:flex;text-decoration:none;';
+            fallbackBtn.innerHTML = '\uD83D\uDCBE داونلۆد / Save Video';
+            $('downloadBtn').parentElement.appendChild(fallbackBtn);
+
+            // Re-enable download button
             setTimeout(() => {
                 $('downloadBtn').disabled = false;
                 $('downloadBtn').innerHTML = origText;

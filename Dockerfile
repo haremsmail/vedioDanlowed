@@ -42,7 +42,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Force cache bust for fresh build without old cached layers
-ARG CACHE_BUST=20260927-v1
+ARG CACHE_BUST=20261004-v5
 
 # Copy composer files first to guarantee clean dependency resolution
 COPY composer.json composer.lock ./
