@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /*
 Full File Purpose
 
@@ -118,12 +118,17 @@ class VideoController extends Controller
 
             // Download synchronously
             $result = $this->ytDlpService->downloadVideo($url, $formatId);
+            $filename = basename($result['file']);
 
             return response()->json([
                 'success'      => true,
                 'message'      => __('messages.download_ready'),
-                'download_url' => $result['download_url'],
-                'filename'     => basename($result['file']),
+                // Return ONLY the relative path — the browser will prepend its own origin
+                // This guarantees https:// when the user is on https:// (Railway, etc.)
+                'file_path'    => '/download/' . rawurlencode($filename),
+                'filename'     => $filename,
+                // Keep download_url for backwards compatibility (will be overridden by JS)
+                'download_url' => '/download/' . rawurlencode($filename),
             ]);
         } catch (Exception $e) {
             Log::error('Download error', [
@@ -152,6 +157,9 @@ class VideoController extends Controller
     public function downloadFile(Request $request, string $file)
     {
         try {
+            // Decode URL-encoding so filenames with special chars work
+            $file = rawurldecode($file);
+
             // Prevent directory traversal
             if (str_contains($file, '..') || str_contains($file, '/') || str_contains($file, '\\')) {
                 abort(400, __('messages.invalid_file'));
@@ -163,9 +171,27 @@ class VideoController extends Controller
                 abort(404, __('messages.file_not_found'));
             }
 
+            // Proper MIME type for mobile browsers
+            $ext  = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            $mime = match($ext) {
+                'mp4'  => 'video/mp4',
+                'webm' => 'video/webm',
+                'mkv'  => 'video/x-matroska',
+                'm4a'  => 'audio/mp4',
+                'mp3'  => 'audio/mpeg',
+                default => 'application/octet-stream',
+            };
+
+            $encodedName = rawurlencode($file);
+
             return response()->download($filePath, $file, [
-                'Content-Type' => 'application/octet-stream',
+                'Content-Type'        => $mime,
+                'Content-Disposition' => "attachment; filename=\"{$file}\"; filename*=UTF-8''{$encodedName}",
+                'Cache-Control'       => 'no-cache, no-store, must-revalidate',
+                'Pragma'              => 'no-cache',
+                'Expires'             => '0',
             ])->deleteFileAfterSend(true);
+
         } catch (Exception $e) {
             Log::error('File download error', ['error' => $e->getMessage()]);
             abort(500, __('messages.download_failed'));

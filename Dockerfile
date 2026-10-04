@@ -1,4 +1,4 @@
-FROM php:8.2-cli
+﻿FROM php:8.2-cli
 
 # Set working directory
 WORKDIR /app
@@ -42,7 +42,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Force cache bust for fresh build without old cached layers
-ARG CACHE_BUST=20261004-v5
+ARG CACHE_BUST=20261004-v6
 
 # Copy composer files first to guarantee clean dependency resolution
 COPY composer.json composer.lock ./

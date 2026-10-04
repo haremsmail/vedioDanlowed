@@ -793,7 +793,12 @@
             showAlert('success', '{{ __("messages.download_ready") }}');
 
             // Universal download: works on mobile, desktop, iOS, Android
-            const dlUrl = data.download_url;
+            // Build the URL from the browser's own origin so it is ALWAYS https://
+            // when the user is on https:// — regardless of server APP_URL setting.
+            const filePath = data.file_path || data.download_url || '';
+            const dlUrl = filePath.startsWith('http')
+                ? filePath  // already absolute (shouldn't happen now)
+                : window.location.origin + filePath;
 
             // 1. Standard anchor click (Desktop + Android Chrome)
             const a = document.createElement('a');
