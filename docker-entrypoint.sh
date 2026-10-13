@@ -31,7 +31,7 @@ if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
     DETECTED_URL="https://${RAILWAY_PUBLIC_DOMAIN}"
 elif [ -n "$RAILWAY_STATIC_URL" ]; then
     DETECTED_URL="https://${RAILWAY_STATIC_URL}"
-elif [ -n "$APP_URL" ] && [ "$APP_URL" != "http://localhost" ]; then
+elif [ -n "$APP_URL" ] && [ "$APP_URL" != "http://localhost" ] && [ "$APP_URL" != "https://localhost" ]; then
     # Already set by user — ensure https://
     DETECTED_URL=$(echo "$APP_URL" | sed 's|^http://|https://|')
 else
@@ -47,11 +47,15 @@ APP_ENV=production
 APP_DEBUG=false
 APP_KEY=
 APP_URL=${DETECTED_URL}
+APP_LOCALE=ku
+APP_FALLBACK_LOCALE=en
+APP_TIMEZONE=Asia/Baghdad
 DB_CONNECTION=sqlite
 DB_DATABASE=/app/database/database.sqlite
 LOG_CHANNEL=stderr
 LOG_LEVEL=warning
 SESSION_DRIVER=file
+SESSION_SECURE_COOKIE=true
 CACHE_DRIVER=file
 QUEUE_CONNECTION=sync
 TRUSTED_PROXIES=*

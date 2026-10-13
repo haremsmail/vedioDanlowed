@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ku" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -765,6 +765,9 @@
             return;
         }
 
+        // Prevent double-click
+        if ($('downloadBtn').disabled) return;
+
         clearAlerts();
         const origText = $('downloadBtn').innerHTML;
         $('downloadBtn').disabled = true;
@@ -772,15 +775,21 @@
         setLoading(true, '{{ __("messages.downloading") }}');
 
         try {
-            const res  = await fetch(`${API}/download`, {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
+
+            const res = await fetch(`${API}/download`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
                 body: JSON.stringify({
                     url:       currentUrl,
                     format_id: selectedFmt.id,
                     quality:   selectedFmt.quality
-                })
+                }),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
             const data = await res.json();
 
             if (!res.ok || !data.success) {
@@ -792,36 +801,40 @@
 
             showAlert('success', '{{ __("messages.download_ready") }}');
 
-            // Universal download: works on mobile, desktop, iOS, Android
-            // Build the URL from the browser's own origin so it is ALWAYS https://
-            // when the user is on https:// — regardless of server APP_URL setting.
+            // Build HTTPS download URL from browser's own origin
             const filePath = data.file_path || data.download_url || '';
             const dlUrl = filePath.startsWith('http')
-                ? filePath  // already absolute (shouldn't happen now)
+                ? filePath
                 : window.location.origin + filePath;
 
-            // 1. Standard anchor click (Desktop + Android Chrome)
+            // Remove any previous fallback button
+            const existingBtn = document.getElementById('fallbackDownloadBtn');
+            if (existingBtn) existingBtn.remove();
+
+            // Method 1: Direct anchor click (works on Desktop + Android Chrome)
+            // Do NOT use target='_blank' — iOS Safari blocks it and Android doesn't need it
             const a = document.createElement('a');
             a.href     = dlUrl;
             a.download = data.filename || 'video.mp4';
-            a.target   = '_blank';
-            a.rel      = 'noopener noreferrer';
+            a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
 
-            // 2. Show persistent Save button for iOS Safari / Firefox mobile
-            const existingBtn = document.getElementById('fallbackDownloadBtn');
-            if (existingBtn) existingBtn.remove();
+            // Clean up after a moment
+            setTimeout(() => {
+                document.body.removeChild(a);
+            }, 1000);
+
+            // Method 2: Show persistent download link for iOS Safari / Firefox mobile
+            // These browsers often ignore programmatic clicks — user must tap manually
             const fallbackBtn = document.createElement('a');
             fallbackBtn.id        = 'fallbackDownloadBtn';
             fallbackBtn.href      = dlUrl;
-            fallbackBtn.target    = '_blank';
-            fallbackBtn.rel       = 'noopener noreferrer';
             fallbackBtn.download  = data.filename || 'video.mp4';
             fallbackBtn.className = 'btn btn-success';
             fallbackBtn.style.cssText = 'margin-top:14px;display:flex;text-decoration:none;';
-            fallbackBtn.innerHTML = '\uD83D\uDCBE داونلۆد / Save Video';
+            fallbackBtn.innerHTML = '💾 {{ __("messages.download_button") }} / Save Video';
+            // Do NOT set target='_blank' — it breaks downloads on iOS Safari
             $('downloadBtn').parentElement.appendChild(fallbackBtn);
 
             // Re-enable download button
@@ -831,7 +844,11 @@
             }, 3000);
 
         } catch (e) {
-            showAlert('error', '{{ __("messages.download_failed") }}');
+            if (e.name === 'AbortError') {
+                showAlert('error', '{{ __("messages.download_failed") }} (timeout)');
+            } else {
+                showAlert('error', '{{ __("messages.download_failed") }}');
+            }
             $('downloadBtn').disabled = false;
             $('downloadBtn').innerHTML = origText;
             console.error(e);

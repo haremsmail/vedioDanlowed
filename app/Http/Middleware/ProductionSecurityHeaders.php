@@ -14,6 +14,13 @@ class ProductionSecurityHeaders
     {
         $response = $next($request);
 
+        // Skip restrictive headers for file download responses
+        // These headers can interfere with mobile download behavior
+        $contentDisposition = $response->headers->get('Content-Disposition', '');
+        if (str_contains($contentDisposition, 'attachment')) {
+            return $response;
+        }
+
         // Prevent MIME type sniffing
         $response->headers->set('X-Content-Type-Options', 'nosniff');
 
@@ -33,9 +40,10 @@ class ProductionSecurityHeaders
         );
 
         // Content Security Policy — allow images from any source (video thumbnails)
+        // Allow blob: for download mechanisms on mobile
         $response->headers->set(
             'Content-Security-Policy',
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self';"
+            "default-src 'self' blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self' blob:;"
         );
 
         // HTTPS Strict Transport Security (only in production)

@@ -19,17 +19,24 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      *
-     * Railway (and most PaaS platforms) sit behind an HTTPS reverse proxy.
+     * Railway / Render / Heroku / any PaaS sits behind an HTTPS reverse proxy.
      * We must trust all proxies so that:
      *   - Request::secure() returns true
      *   - route() / url() generate https:// links
-     *   - The file download URL is HTTPS → no "can't be downloaded securely" error
+     *   - File download URLs are HTTPS → no "not secure" / mixed-content errors
      */
     public function boot(): void
     {
-        // Trust every upstream proxy (Railway load-balancer terminates TLS)
+        // Read proxy trust from env — '*' means trust all (standard for PaaS)
+        $proxies = env('TRUSTED_PROXIES', '*');
+        if ($proxies === '*') {
+            $proxies = '*';
+        } else {
+            $proxies = array_filter(array_map('trim', explode(',', $proxies)));
+        }
+
         Request::setTrustedProxies(
-            ['127.0.0.1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'REMOTE_ADDR'],
+            is_array($proxies) ? $proxies : ['*'],
             Request::HEADER_X_FORWARDED_FOR |
             Request::HEADER_X_FORWARDED_HOST |
             Request::HEADER_X_FORWARDED_PORT |
@@ -37,8 +44,9 @@ class AppServiceProvider extends ServiceProvider
             Request::HEADER_X_FORWARDED_AWS_ELB
         );
 
-        // When running in production (Railway), always generate https:// URLs
-        if (app()->environment('production')) {
+        // Always generate https:// URLs in production
+        // This prevents "not secure" / mixed-content warnings on every browser
+        if (app()->environment('production') || str_starts_with(config('app.url', ''), 'https')) {
             URL::forceScheme('https');
         }
     }

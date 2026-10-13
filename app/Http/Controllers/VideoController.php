@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /*
 Full File Purpose
 
@@ -153,6 +153,9 @@ class VideoController extends Controller
     /**
      * Serve the downloaded file to the browser
      * GET /download/{file}
+     *
+     * Uses StreamedResponse for memory-efficient large-file delivery.
+     * Supports HTTP Range requests so mobile browsers can resume interrupted downloads.
      */
     public function downloadFile(Request $request, string $file)
     {
@@ -165,11 +168,18 @@ class VideoController extends Controller
                 abort(400, __('messages.invalid_file'));
             }
 
+            // Only allow files matching our secure naming pattern
+            if (!preg_match('/^v_[a-f0-9]{32}\.[a-z0-9]{2,5}$/', $file)) {
+                abort(400, __('messages.invalid_file'));
+            }
+
             $filePath = $this->ytDlpService->getDownloadsPath() . DIRECTORY_SEPARATOR . $file;
 
             if (!file_exists($filePath)) {
                 abort(404, __('messages.file_not_found'));
             }
+
+            $fileSize = filesize($filePath);
 
             // Proper MIME type for mobile browsers
             $ext  = strtolower(pathinfo($file, PATHINFO_EXTENSION));
@@ -179,18 +189,78 @@ class VideoController extends Controller
                 'mkv'  => 'video/x-matroska',
                 'm4a'  => 'audio/mp4',
                 'mp3'  => 'audio/mpeg',
+                'ogg'  => 'audio/ogg',
+                'wav'  => 'audio/wav',
                 default => 'application/octet-stream',
             };
 
             $encodedName = rawurlencode($file);
 
-            return response()->download($filePath, $file, [
+            // ── Handle HTTP Range requests (mobile resume support) ──
+            $start  = 0;
+            $end    = $fileSize - 1;
+            $status = 200;
+            $headers = [
                 'Content-Type'        => $mime,
                 'Content-Disposition' => "attachment; filename=\"{$file}\"; filename*=UTF-8''{$encodedName}",
+                'Accept-Ranges'       => 'bytes',
                 'Cache-Control'       => 'no-cache, no-store, must-revalidate',
                 'Pragma'              => 'no-cache',
                 'Expires'             => '0',
-            ])->deleteFileAfterSend(true);
+                'X-Content-Type-Options' => 'nosniff',
+            ];
+
+            if ($request->hasHeader('Range')) {
+                $range = $request->header('Range');
+                if (preg_match('/bytes=(\d+)-(\d*)/', $range, $matches)) {
+                    $start = (int) $matches[1];
+                    $end   = !empty($matches[2]) ? (int) $matches[2] : $fileSize - 1;
+
+                    if ($start > $end || $start >= $fileSize) {
+                        return response('', 416, [
+                            'Content-Range' => "bytes */{$fileSize}",
+                        ]);
+                    }
+
+                    $status = 206;
+                    $headers['Content-Range']  = "bytes {$start}-{$end}/{$fileSize}";
+                }
+            }
+
+            $length = $end - $start + 1;
+            $headers['Content-Length'] = $length;
+
+            // Stream the file without loading it all into memory
+            return response()->stream(function () use ($filePath, $start, $length) {
+                $handle = fopen($filePath, 'rb');
+                if ($handle === false) {
+                    return;
+                }
+
+                if ($start > 0) {
+                    fseek($handle, $start);
+                }
+
+                $remaining = $length;
+                $chunkSize = 8192; // 8KB chunks
+
+                while ($remaining > 0 && !feof($handle)) {
+                    $read = min($chunkSize, $remaining);
+                    $data = fread($handle, $read);
+                    if ($data === false) {
+                        break;
+                    }
+                    echo $data;
+                    $remaining -= strlen($data);
+
+                    if (connection_aborted()) {
+                        break;
+                    }
+                    flush();
+                }
+
+                fclose($handle);
+            }, $status, $headers);
 
         } catch (Exception $e) {
             Log::error('File download error', ['error' => $e->getMessage()]);

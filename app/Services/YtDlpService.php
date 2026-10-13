@@ -100,8 +100,7 @@ class YtDlpService
     }
 
     /**
-     * Check if the URL is a valid web URL that yt-dlp can try to process.
-     * Accepts any valid HTTP/HTTPS URL — yt-dlp supports thousands of sites.
+     * Check if the URL belongs to a supported platform and does not target internal/private networks (SSRF prevention).
      */
     public function isSupportedPlatform(string $url): bool
     {
@@ -110,9 +109,105 @@ class YtDlpService
         }
 
         $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-        $host   = (string) parse_url($url, PHP_URL_HOST);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
 
-        return in_array($scheme, ['http', 'https'], true) && $host !== '';
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        if ($host === '') {
+            return false;
+        }
+
+        // Block localhost and cloud metadata endpoints
+        if ($host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
+            return false;
+        }
+
+        if (in_array($host, ['metadata.google.internal', 'instance-data', '169.254.169.254'], true)) {
+            return false;
+        }
+
+        // Block private and reserved IP addresses directly
+        $cleanHost = trim($host, '[]');
+        if ($this->isPrivateOrReservedIp($cleanHost)) {
+            return false;
+        }
+
+        // Check host against configured supported platforms
+        $supportedPlatforms = (array) config('ytdlp.supported_platforms', []);
+        $matched = false;
+        foreach ($supportedPlatforms as $platform) {
+            $platform = strtolower(trim((string) $platform));
+            if ($platform !== '' && ($host === $platform || str_ends_with($host, '.' . $platform))) {
+                $matched = true;
+                break;
+            }
+        }
+
+        if (!$matched) {
+            return false;
+        }
+
+        // Resolve DNS and verify the resolved IP is not internal/private (DNS rebinding / SSRF protection)
+        $resolvedIp = gethostbyname($host);
+        if ($resolvedIp !== $host && $this->isPrivateOrReservedIp($resolvedIp)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if an IP address is in a private, loopback, or reserved range.
+     */
+    private function isPrivateOrReservedIp(string $ip): bool
+    {
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            return false;
+        }
+
+        // Filter flags check private and reserved ranges
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return true;
+        }
+
+        // Explicit check for cloud metadata / loopback / link-local / private IPv6 ranges
+        $packed = @inet_pton($ip);
+        if ($packed === false) {
+            return false;
+        }
+
+        if (strlen($packed) === 4) {
+            $bytes = array_values(unpack('C*', $packed));
+            // 0.0.0.0/8
+            if ($bytes[0] === 0) return true;
+            // 10.0.0.0/8
+            if ($bytes[0] === 10) return true;
+            // 127.0.0.0/8
+            if ($bytes[0] === 127) return true;
+            // 169.254.0.0/16 (includes 169.254.169.254)
+            if ($bytes[0] === 169 && $bytes[1] === 254) return true;
+            // 172.16.0.0/12
+            if ($bytes[0] === 172 && $bytes[1] >= 16 && $bytes[1] <= 31) return true;
+            // 192.168.0.0/16
+            if ($bytes[0] === 192 && $bytes[1] === 168) return true;
+        } elseif (strlen($packed) === 16) {
+            // ::1 (loopback) or :: (unspecified)
+            if ($packed === "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x01" || $packed === str_repeat("\0", 16)) {
+                return true;
+            }
+            // fc00::/7 (including fd00::/8)
+            $firstByte = ord($packed[0]);
+            if (($firstByte & 0xFE) === 0xFC) {
+                return true;
+            }
+            // fe80::/10 (link-local)
+            if ($firstByte === 0xFE && (ord($packed[1]) & 0xC0) === 0x80) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
