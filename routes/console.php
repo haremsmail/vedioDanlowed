@@ -1,6 +1,8 @@
 <?php
 
-use Illuminate\Support\Facades\Schedule;
 use App\Jobs\CleanupOldDownloads;
+use Illuminate\Support\Facades\Schedule;
 
-Schedule::job(new CleanupOldDownloads)->hourly();
+Schedule::call(fn () => (new CleanupOldDownloads())->handle())
+    ->everyFiveMinutes()
+    ->name('cleanup-downloads');

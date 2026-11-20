@@ -1,35 +1,38 @@
+# Render.com Blueprint — free plan.
+# Dashboard → New → Blueprint → pick this GitHub repo → Apply.
 services:
   - type: web
-    name: savetube
+    name: video-downloader
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
+    healthCheckPath: /up
+    autoDeploy: true
     envVars:
-      - key: APP_NAME
-        value: SaveTube
+      - key: APP_KEY
+        generateValue: true
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
         value: "false"
-      - key: APP_KEY
-        generateValue: true
-      - key: APP_URL
+      - key: WEB_WORKERS
+        value: "8"
+      - key: MAX_CONCURRENT_DOWNLOADS
+        value: "2"
+      - key: MAX_DOWNLOAD_SIZE
+        value: 1G
+      - key: FILE_TTL_MINUTES
+        value: "30"
+      # ── Ads / income (fill in later from the dashboard) ──
+      - key: ADSENSE_CLIENT
         sync: false
-      - key: DB_CONNECTION
-        value: sqlite
-      - key: DB_DATABASE
-        value: /app/database/database.sqlite
-      - key: LOG_CHANNEL
-        value: stderr
-      - key: LOG_LEVEL
-        value: warning
-      - key: SESSION_DRIVER
-        value: file
-      - key: CACHE_DRIVER
-        value: file
-      - key: QUEUE_CONNECTION
-        value: sync
-      - key: RATE_LIMIT
-        value: "60"
-      - key: RATE_LIMIT_PERIOD
-        value: "60"
+      - key: ADSENSE_SLOT_TOP
+        sync: false
+      - key: ADSENSE_SLOT_MIDDLE
+        sync: false
+      - key: ADSENSE_SLOT_BOTTOM
+        sync: false
+      - key: ADS_TXT
+        sync: false
+      - key: GA_MEASUREMENT_ID
+        sync: false

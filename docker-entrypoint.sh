@@ -1,82 +1,80 @@
 #!/bin/bash
 set -e
+cd /app
 
-echo "🚀 Starting SaveTube..."
+echo "Starting video downloader..."
 
-# 1. Immediately delete any stale bootstrap cache files BEFORE Laravel boots
-rm -f /app/bootstrap/cache/*.php /app/bootstrap/cache/*.tmp 2>/dev/null || true
+rm -f bootstrap/cache/*.php 2>/dev/null || true
+mkdir -p storage/framework/{cache/data,sessions,views} storage/logs storage/downloads storage/app/jobs storage/app/yt-dlp-cache database
 
-# 2. Create all required directories
-mkdir -p /app/storage/framework/cache/data
-mkdir -p /app/storage/framework/sessions
-mkdir -p /app/storage/framework/views
-mkdir -p /app/storage/framework/testing
-mkdir -p /app/storage/logs
-mkdir -p /app/storage/downloads
-mkdir -p /app/bootstrap/cache
-mkdir -p /app/database
-
-# 3. Set open permissions
-chmod -R 777 /app/storage
-chmod -R 777 /app/bootstrap/cache
-chmod -R 777 /app/database
-
-# 4. Update yt-dlp to latest version (fixes broken downloads on TikTok, YouTube, etc.)
-echo "⬆️  Updating yt-dlp to latest version..."
-/opt/ytdlp-venv/bin/pip install --no-cache-dir --upgrade yt-dlp 2>/dev/null && echo "✅ yt-dlp updated" || echo "⚠️  yt-dlp update skipped (using existing)"
-
-# 5. Determine the public APP_URL
-# Railway provides RAILWAY_PUBLIC_DOMAIN or RAILWAY_STATIC_URL automatically
-if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
-    DETECTED_URL="https://${RAILWAY_PUBLIC_DOMAIN}"
-elif [ -n "$RAILWAY_STATIC_URL" ]; then
-    DETECTED_URL="https://${RAILWAY_STATIC_URL}"
-elif [ -n "$APP_URL" ] && [ "$APP_URL" != "http://localhost" ] && [ "$APP_URL" != "https://localhost" ]; then
-    # Already set by user — ensure https://
-    DETECTED_URL=$(echo "$APP_URL" | sed 's|^http://|https://|')
-else
-    DETECTED_URL="http://localhost"
+# ── 1. Public URL (Render / Railway / Koyeb set these automatically) ──────────
+if   [ -n "$RENDER_EXTERNAL_URL" ];      then DETECTED_URL="$RENDER_EXTERNAL_URL"
+elif [ -n "$RAILWAY_PUBLIC_DOMAIN" ];    then DETECTED_URL="https://${RAILWAY_PUBLIC_DOMAIN}"
+elif [ -n "$KOYEB_PUBLIC_DOMAIN" ];      then DETECTED_URL="https://${KOYEB_PUBLIC_DOMAIN}"
+elif [ -n "$APP_URL" ];                  then DETECTED_URL="$APP_URL"
+else DETECTED_URL="http://localhost:${PORT:-8000}"
 fi
+export APP_URL="$DETECTED_URL"
+echo "APP_URL: $APP_URL"
 
-echo "🌐 APP_URL detected: $DETECTED_URL"
-
-# 6. Create .env file with all required values
-cat > /app/.env << EOF
-APP_NAME=SaveTube
+# ── 2. Defaults (real environment variables always win over .env) ─────────────
+cat > .env <<EOF
+APP_NAME="Video Downloader"
 APP_ENV=production
 APP_DEBUG=false
 APP_KEY=
-APP_URL=${DETECTED_URL}
 APP_LOCALE=ku
 APP_FALLBACK_LOCALE=en
 APP_TIMEZONE=Asia/Baghdad
-DB_CONNECTION=sqlite
-DB_DATABASE=/app/database/database.sqlite
 LOG_CHANNEL=stderr
 LOG_LEVEL=warning
+DB_CONNECTION=sqlite
+DB_DATABASE=/app/database/database.sqlite
 SESSION_DRIVER=file
 SESSION_SECURE_COOKIE=true
-CACHE_DRIVER=file
+CACHE_STORE=file
 QUEUE_CONNECTION=sync
 TRUSTED_PROXIES=*
 EOF
 
-# 7. Create SQLite database file
-touch /app/database/database.sqlite
-chmod 777 /app/database/database.sqlite
+touch database/database.sqlite
 
-# 8. Generate APP_KEY
-echo "🔑 Generating APP_KEY..."
-php artisan key:generate --force --no-interaction
+# APP_KEY: use the one from the hosting dashboard, otherwise generate one
+if [ -z "$APP_KEY" ]; then
+    php artisan key:generate --force --no-interaction >/dev/null
+    echo "WARNING: APP_KEY not set - generated a temporary one (set APP_KEY in your host for stable sessions)."
+fi
 
-# 9. Run migrations
-echo "🗃️ Running migrations..."
-php artisan migrate --force --no-interaction
+# ── 3. Cookies for YouTube / Instagram (optional but strongly recommended) ────
+#   Option A: Render "Secret File" named cookies.txt  -> /etc/secrets/cookies.txt
+#   Option B: env var YTDLP_COOKIES_B64 = base64 of your cookies.txt
+if [ -f /etc/secrets/cookies.txt ]; then
+    cp /etc/secrets/cookies.txt storage/app/cookies.txt
+    echo "cookies.txt loaded from secret file"
+elif [ -n "$YTDLP_COOKIES_B64" ]; then
+    echo "$YTDLP_COOKIES_B64" | base64 -d > storage/app/cookies.txt 2>/dev/null && echo "cookies.txt loaded from env"
+fi
+[ -f storage/app/cookies.txt ] && chmod 600 storage/app/cookies.txt
 
-# 10. Cache routes and views (non-blocking)
-php artisan config:cache 2>/dev/null || true
-php artisan route:cache 2>/dev/null || true
-php artisan view:cache 2>/dev/null || true
+# ── 4. Keep yt-dlp fresh (sites change often; old versions stop working) ──────
+timeout 60 /opt/ytdlp/bin/pip install -q --no-cache-dir --upgrade "yt-dlp[default,curl-cffi]" 2>/dev/null \
+    && echo "yt-dlp: $(yt-dlp --version)" || echo "yt-dlp update skipped"
 
-echo "✅ Starting on port ${PORT:-8000}..."
-exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
+php artisan migrate --force --no-interaction >/dev/null 2>&1 || true
+php artisan config:cache >/dev/null
+php artisan route:cache  >/dev/null
+php artisan view:cache   >/dev/null
+
+chown -R www-data:www-data storage bootstrap/cache database 2>/dev/null || true
+
+# ── 5. Background services ────────────────────────────────────────────────────
+# download worker (auto-restarts if it ever crashes)
+( while true; do php artisan video:worker; echo "worker restarted"; sleep 2; done ) &
+# cleanup of old files every 5 minutes
+php artisan schedule:work >/dev/null 2>&1 &
+
+# ── 6. Web server: several workers so one slow request never blocks the site ──
+export PHP_CLI_SERVER_WORKERS="${WEB_WORKERS:-8}"
+echo "Listening on port ${PORT:-8000} with $PHP_CLI_SERVER_WORKERS workers"
+cd /app/public
+exec php -S 0.0.0.0:"${PORT:-8000}" /app/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php

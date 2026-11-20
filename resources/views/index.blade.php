@@ -1,871 +1,434 @@
-<!DOCTYPE html>
-<html lang="ku" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ __('messages.title') }} - داونلۆدەری ویدیۆ</title>
-    <meta name="description" content="{{ __('messages.description') }}">
-    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary:       #6c63ff;
-            --primary-dark:  #5a52d5;
-            --primary-light: #8b85ff;
-            --accent:        #ff6584;
-            --success:       #2ecc71;
-            --warning:       #f39c12;
-            --danger:        #e74c3c;
-            --bg:            #0d0e1a;
-            --surface:       #161728;
-            --surface2:      #1e2035;
-            --surface3:      #252740;
-            --text:          #eeeef5;
-            --text-muted:    #9898b8;
-            --border:        rgba(108,99,255,0.18);
-            --glow:          rgba(108,99,255,0.35);
-            --radius:        16px;
-            --radius-sm:     10px;
-        }
+@extends('layouts.app')
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+@section('styles')
+    .hero { text-align: center; padding: 20px 0 8px; }
+    .hero h1 { font-size: clamp(24px, 6vw, 36px); font-weight: 800; line-height: 1.4; letter-spacing: -.3px; }
+    .hero h1 span { background: linear-gradient(135deg, var(--primary), var(--primary-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero p { color: var(--muted); margin-top: 8px; font-size: 15px; }
 
-        body {
-            font-family: 'Noto Kufi Arabic', 'Segoe UI', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-            background-image:
-                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108,99,255,0.18) 0%, transparent 70%),
-                radial-gradient(ellipse 60% 40% at 80% 110%, rgba(255,101,132,0.10) 0%, transparent 60%);
-        }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 18px 0 4px; }
+    .chip { font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
 
-        /* ── HEADER ────────────────────────────────────── */
-        .header {
-            text-align: center;
-            padding: 40px 20px 20px;
-            width: 100%;
-            max-width: 700px;
-        }
-        .logo {
-            font-size: 52px;
-            margin-bottom: 12px;
-            filter: drop-shadow(0 0 18px rgba(108,99,255,0.6));
-            animation: float 4s ease-in-out infinite;
-        }
-        @keyframes float {
-            0%,100% { transform: translateY(0); }
-            50%      { transform: translateY(-8px); }
-        }
-        .header h1 {
-            font-size: 30px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #fff 30%, var(--primary-light));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 8px;
-        }
-        .header p {
-            color: var(--text-muted);
-            font-size: 15px;
-            line-height: 1.6;
-            margin: 0;
-        }
-        .platform-badges {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 14px;
-        }
-        .badge {
-            padding: 6px 14px;
-            border-radius: 30px;
-            font-size: 12px;
-            font-weight: 600;
-            border: 1px solid var(--border);
-            background: linear-gradient(135deg, var(--surface2), var(--surface3));
-            color: var(--text-muted);
-            transition: all 0.2s;
-            cursor: default;
-        }
-        .badge:hover {
-            border-color: var(--primary);
-            background: var(--surface3);
-            color: var(--primary-light);
-        }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; margin-top: 20px; }
 
-        /* ── CARD ──────────────────────────────────────── */
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 36px;
-            width: 100%;
-            max-width: 700px;
-            box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
-            margin-top: 10px;
-        }
+    .input-row { display: flex; gap: 8px; background: var(--surface-2); border: 1.5px solid var(--border); border-radius: 16px; padding: 6px; transition: border-color .2s, box-shadow .2s; }
+    .input-row:focus-within { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
+    .input-row input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 15px; padding: 10px 12px; direction: ltr; text-align: left; }
+    .input-row input::placeholder { color: var(--muted); }
+    .btn-ghost { border: 0; background: var(--surface); color: var(--primary); font: inherit; font-weight: 700; font-size: 13px; padding: 0 14px; border-radius: 12px; cursor: pointer; white-space: nowrap; }
+    .btn-ghost:hover { background: var(--primary-soft); }
 
-        /* ── URL INPUT ─────────────────────────────────── */
-        .input-section { margin-bottom: 24px; }
-        .input-label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 10px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .input-wrapper {
-            display: flex;
-            gap: 10px;
-            align-items: stretch;
-        }
-        .url-input {
-            flex: 1;
-            background: var(--surface2);
-            border: 1.5px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 14px 18px;
-            font-size: 14px;
-            color: var(--text);
-            font-family: inherit;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            direction: ltr;
-            text-align: left;
-        }
-        .url-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(108,99,255,0.2);
-        }
-        .url-input::placeholder { color: var(--text-muted); font-size: 13px; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 0; border-radius: 14px; font: inherit; font-weight: 700; font-size: 16px; padding: 14px 20px; cursor: pointer; transition: transform .15s, opacity .2s, box-shadow .2s; text-decoration: none !important; }
+    .btn:active { transform: scale(.98); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: var(--on-primary); box-shadow: 0 8px 24px var(--primary-soft); margin-top: 12px; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-soft { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
 
-        .btn-paste {
-            background: var(--surface3);
-            border: 1.5px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--primary-light);
-            font-family: inherit;
-            font-size: 13px;
-            font-weight: 600;
-            padding: 0 18px;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-paste:hover {
-            background: var(--primary);
-            color: #fff;
-            border-color: var(--primary);
-        }
+    .spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── BUTTONS ───────────────────────────────────── */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            border: none;
-            border-radius: var(--radius-sm);
-            font-family: inherit;
-            font-size: 15px;
-            font-weight: 700;
-            padding: 14px 28px;
-            cursor: pointer;
-            transition: all 0.25s;
-            width: 100%;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: #fff;
-            box-shadow: 0 8px 24px rgba(108,99,255,0.35);
-        }
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 32px rgba(108,99,255,0.5);
-        }
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .btn-secondary {
-            background: var(--surface3);
-            color: var(--text-muted);
-            border: 1px solid var(--border);
-        }
-        .btn-secondary:hover { background: var(--surface2); color: var(--text); }
+    .alert { display: none; margin-top: 14px; padding: 12px 14px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+    .alert.show { display: block; }
+    .alert.error { background: var(--danger-soft); color: var(--danger); }
+    .alert.success { background: var(--success-soft); color: var(--success); }
+    .alert.warning { background: var(--warning-soft); color: var(--warning); }
 
-        .btn-success {
-            background: linear-gradient(135deg, #2ecc71, #27ae60);
-            color: #fff;
-            box-shadow: 0 8px 24px rgba(46,204,113,0.3);
-        }
-        .btn-success:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 32px rgba(46,204,113,0.5);
-        }
-        .btn-success:disabled { opacity: 0.5; cursor: not-allowed; }
+    .skeleton { display: none; margin-top: 18px; gap: 14px; }
+    .skeleton.show { display: flex; }
+    .sk { background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%; animation: sh 1.2s infinite; border-radius: 12px; }
+    @keyframes sh { to { background-position: -200% 0; } }
 
-        /* ── ALERTS ────────────────────────────────────── */
-        .alert {
-            display: none;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 14px 18px;
-            border-radius: var(--radius-sm);
-            margin-bottom: 20px;
-            font-size: 14px;
-            line-height: 1.5;
-            animation: slideDown 0.3s ease;
-        }
-        .alert.show { display: flex; }
-        .alert-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
-        .alert-success { background: rgba(46,204,113,0.15); border: 1px solid rgba(46,204,113,0.3); color: #6dffa8; }
-        .alert-error   { background: rgba(231,76,60,0.15);  border: 1px solid rgba(231,76,60,0.3);  color: #ff9d95; }
-        .alert-warning { background: rgba(243,156,18,0.15); border: 1px solid rgba(243,156,18,0.3); color: #ffd080; }
-        .alert-info    { background: rgba(108,99,255,0.15); border: 1px solid rgba(108,99,255,0.3); color: #b8b3ff; }
+    #result { display: none; margin-top: 20px; }
+    #result.show { display: block; animation: fade .3s ease; }
+    @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-8px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
+    .video { display: flex; gap: 14px; align-items: flex-start; }
+    .thumb { position: relative; flex: 0 0 160px; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: var(--surface-2); }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .thumb .dur { position: absolute; bottom: 6px; left: 6px; background: rgba(0,0,0,.75); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 6px; direction: ltr; }
+    .video h2 { font-size: 15px; font-weight: 700; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+    .video .by { color: var(--muted); font-size: 13px; margin-top: 4px; }
 
-        /* ── LOADING ───────────────────────────────────── */
-        .loading-bar-wrap {
-            display: none;
-            margin: 20px 0;
-            text-align: center;
-        }
-        .loading-bar-wrap.show { display: block; }
-        .loading-text {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 12px;
-        }
-        .loading-bar {
-            height: 4px;
-            background: var(--surface3);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        .loading-bar-inner {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--accent), var(--primary));
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 4px;
-            width: 100%;
-        }
-        @keyframes shimmer {
-            0%   { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
+    .section-label { font-size: 13px; font-weight: 700; color: var(--muted); margin: 20px 0 10px; }
+    .qgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+    .q { position: relative; border: 1.5px solid var(--border); background: var(--surface); border-radius: 12px; padding: 10px; cursor: pointer; text-align: center; font: inherit; color: var(--text); transition: border-color .15s, background .15s; }
+    .q:hover { border-color: var(--primary); }
+    .q.sel { border-color: var(--primary); background: var(--primary-soft); }
+    .q b { display: block; font-size: 16px; direction: ltr; }
+    .q small { display: block; color: var(--muted); font-size: 11px; direction: ltr; }
+    .q .tag { position: absolute; top: -8px; inset-inline-end: 8px; font-size: 10px; font-weight: 800; padding: 0 6px; border-radius: 6px; background: var(--primary); color: #fff; }
 
-        /* ── VIDEO INFO ────────────────────────────────── */
-        #videoInfo { display: none; }
-        #videoInfo.show {
-            display: block;
-            animation: slideDown 0.4s ease;
-        }
+    .actions { display: flex; gap: 10px; margin-top: 18px; }
+    .actions .btn { margin: 0; }
+    .actions .btn-soft { flex: 0 0 34%; }
 
-        .divider {
-            height: 1px;
-            background: var(--border);
-            margin: 24px 0;
-        }
+    .progress { display: none; margin-top: 18px; }
+    .progress.show { display: block; }
+    .bar { height: 12px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+    .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--primary), var(--primary-2)); border-radius: 999px; transition: width .4s ease; }
+    .bar.indeterminate i { width: 35% !important; animation: ind 1.2s ease-in-out infinite; }
+    @keyframes ind { 0% { margin-inline-start: -35%; } 100% { margin-inline-start: 100%; } }
+    .pmeta { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 8px; gap: 10px; }
+    .pmeta b { color: var(--text); direction: ltr; }
 
-        .thumbnail-wrap {
-            position: relative;
-            border-radius: var(--radius);
-            overflow: hidden;
-            margin-bottom: 20px;
-            background: var(--surface2);
-            aspect-ratio: 16/9;
-        }
-        .thumbnail-wrap img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-        .thumbnail-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 60%;
-            background: linear-gradient(transparent, rgba(0,0,0,0.7));
-        }
-        .duration-badge {
-            position: absolute;
-            bottom: 12px;
-            left: 12px;
-            background: rgba(0,0,0,0.8);
-            color: #fff;
-            padding: 3px 10px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-        }
+    .done { display: none; margin-top: 18px; text-align: center; }
+    .done.show { display: block; animation: fade .3s ease; }
+    .done .ok { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 10px; background: var(--success-soft); color: var(--success); }
+    .done .btn { margin-top: 10px; }
 
-        .video-meta { margin-bottom: 20px; }
-        .video-meta-title {
-            font-size: 17px;
-            font-weight: 700;
-            color: var(--text);
-            line-height: 1.4;
-            margin-bottom: 6px;
-        }
-        .video-meta-sub {
-            font-size: 13px;
-            color: var(--text-muted);
-        }
+    .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 28px; }
+    .feat { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; text-align: center; }
+    .feat .ic { width: 38px; height: 38px; margin: 0 auto 6px; border-radius: 10px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); }
+    .feat b { display: block; font-size: 14px; }
+    .feat span { font-size: 12px; color: var(--muted); }
 
-        /* ── QUALITY GRID ──────────────────────────────── */
-        .quality-label {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 12px;
-        }
-        .quality-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-            gap: 10px;
-            margin-bottom: 24px;
-        }
-        .quality-btn {
-            background: var(--surface2);
-            border: 1.5px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 14px 10px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            color: var(--text);
-            user-select: none;
-            position: relative;
-            overflow: hidden;
-        }
-        .quality-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-            transition: left 0.5s;
-        }
-        .quality-btn:hover {
-            border-color: var(--primary-light);
-            background: var(--surface3);
-            transform: translateY(-2px);
-        }
-        .quality-btn:hover::before {
-            left: 100%;
-        }
-        .quality-btn.selected {
-            border-color: var(--primary);
-            background: rgba(108,99,255,0.18);
-            box-shadow: 0 0 0 2px rgba(108,99,255,0.3), 0 4px 16px rgba(108,99,255,0.25);
-        }
-        .quality-btn .q-label {
-            font-size: 15px;
-            font-weight: 700;
-            display: block;
-            margin-bottom: 3px;
-        }
-        .quality-btn .q-sub {
-            font-size: 11px;
-            color: var(--text-muted);
-            display: block;
-        }
-        .quality-btn .q-info {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-top: 4px;
-            opacity: 0.7;
-        }
-        .quality-btn.selected .q-sub { color: var(--primary-light); }
-        .quality-btn.selected .q-info { color: var(--primary-light); opacity: 1; }
-        .quality-btn.audio-btn .q-label { font-size: 13px; }
+    h3.h { font-size: 20px; font-weight: 800; margin: 40px 0 14px; text-align: center; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .step { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+    .step .n { width: 28px; height: 28px; border-radius: 8px; background: var(--primary); color: #fff; font-weight: 800; display: grid; place-items: center; margin-bottom: 8px; }
+    .step p { font-size: 14px; }
 
-        /* ── FORMAT BADGES ────────────────────────────── */
-        .format-info {
-            background: rgba(108, 99, 255, 0.08);
-            border: 1px solid rgba(108, 99, 255, 0.2);
-            border-radius: var(--radius-sm);
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            font-size: 13px;
-            color: var(--text-muted);
-            line-height: 1.6;
-        }
-        .format-badge {
-            display: inline-block;
-            background: rgba(108, 99, 255, 0.15);
-            color: var(--primary-light);
-            padding: 2px 8px;
-            border-radius: 4px;
-            margin: 2px 4px 2px 0;
-            font-size: 12px;
-            font-weight: 600;
-        }
+    details { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px; }
+    summary { cursor: pointer; font-weight: 700; font-size: 15px; }
+    details p { color: var(--muted); font-size: 14px; margin-top: 8px; }
 
-        /* ── ACTION BUTTONS ────────────────────────────── */
-        .action-row {
-            display: flex;
-            gap: 12px;
-            margin-top: 8px;
-        }
-        .action-row .btn { flex: 1; }
+    @media (max-width: 600px) {
+        .card { padding: 16px; }
+        .video { flex-direction: column; }
+        .thumb { flex: none; width: 100%; }
+        .grid4 { grid-template-columns: repeat(2, 1fr); }
+        .steps { grid-template-columns: 1fr; }
+        .qgrid { grid-template-columns: repeat(3, 1fr); }
+        .actions { flex-direction: column-reverse; }
+        .actions .btn-soft { flex: none; }
+    }
+@endsection
 
-        /* ── FOOTER ────────────────────────────────────── */
-        .footer {
-            text-align: center;
-            margin-top: 28px;
-            padding-bottom: 30px;
-            color: var(--text-muted);
-            font-size: 13px;
-            line-height: 1.7;
-        }
-        .footer span { color: var(--accent); }
+@section('content')
+    @include('ads.slot', ['slot' => config('ads.adsense_slot_top'), 'custom' => true])
 
-        /* ── RESPONSIVE ────────────────────────────────── */
-        @media (max-width: 500px) {
-            .card { padding: 24px 18px; }
-            .header h1 { font-size: 22px; }
-            .input-wrapper { flex-direction: column; }
-            .btn-paste { padding: 14px; }
-            .quality-grid { grid-template-columns: repeat(3, 1fr); }
-            .action-row { flex-direction: column-reverse; }
-        }
-    </style>
-</head>
-<body>
-
-    <!-- HEADER -->
-    <div class="header">
-        <div class="logo">🎬</div>
-        <h1>{{ __('messages.title') }}</h1>
-        <p>{{ __('messages.subtitle') ?? __('messages.description') }}</p>
-        <div class="platform-badges">
-            <span class="badge">▶ {{ __('messages.platform_youtube') }}</span>
-            <span class="badge">♪ {{ __('messages.platform_tiktok') }}</span>
-            <span class="badge">📷 {{ __('messages.platform_instagram') }}</span>
-            <span class="badge">📸 {{ __('messages.platform_snapchat') }}</span>
-            <span class="badge">👍 {{ __('messages.platform_facebook') }}</span>
-            <span class="badge">🐦 {{ __('messages.platform_twitter') }}</span>
+    <section class="hero">
+        <h1><span>{{ trim(__('messages.title')) }}</span><br>YouTube · TikTok · Instagram</h1>
+        <p>{{ __('messages.subtitle') }}</p>
+        <div class="chips" aria-hidden="true">
+            <span class="chip">YouTube</span><span class="chip">TikTok</span><span class="chip">Instagram</span>
+            <span class="chip">Facebook</span><span class="chip">X / Twitter</span><span class="chip">Snapchat</span>
+            <span class="chip">Pinterest</span><span class="chip">Reddit</span>
         </div>
+    </section>
+
+    <main class="card">
+        <form id="form" autocomplete="off" novalidate>
+            <label for="url" class="section-label" style="display:block;margin-top:0">{{ __('messages.input_url') }}</label>
+            <div class="input-row">
+                <input type="url" id="url" inputmode="url" placeholder="https://..." spellcheck="false" required>
+                <button type="button" class="btn-ghost" id="pasteBtn">{{ __('messages.paste_button') }}</button>
+            </div>
+            <button type="submit" class="btn btn-primary" id="analyzeBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                <span>{{ __('messages.analyze_button') }}</span>
+            </button>
+        </form>
+
+        <div class="alert" id="alert" role="alert"></div>
+
+        <div class="skeleton" id="skeleton" aria-hidden="true">
+            <div class="sk" style="flex:0 0 160px;aspect-ratio:16/9"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+                <div class="sk" style="height:16px"></div><div class="sk" style="height:16px;width:70%"></div><div class="sk" style="height:12px;width:40%"></div>
+            </div>
+        </div>
+
+        <section id="result" aria-live="polite">
+            <div class="video">
+                <div class="thumb"><img id="thumb" alt="" referrerpolicy="no-referrer" loading="lazy"><span class="dur" id="dur"></span></div>
+                <div><h2 id="vtitle"></h2><div class="by" id="vby"></div></div>
+            </div>
+
+            <div id="picker">
+                <div class="section-label">{{ __('messages.available_qualities') }}</div>
+                <div class="qgrid" id="qgrid"></div>
+                <div class="actions">
+                    <button type="button" class="btn btn-soft" id="backBtn">{{ __('messages.back_button') }}</button>
+                    <button type="button" class="btn btn-primary" id="dlBtn" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                        <span>{{ __('messages.download_button') }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="progress" id="progress">
+                <div class="bar" id="bar"><i></i></div>
+                <div class="pmeta"><span id="pstatus">{{ __('messages.starting') }}</span><b id="ppct">0%</b></div>
+                <div class="pmeta"><span id="pspeed"></span><span id="peta"></span></div>
+                @include('ads.slot', ['slot' => config('ads.adsense_slot_middle'), 'custom' => true])
+            </div>
+
+            <div class="done" id="done">
+                <div class="ok"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+                <b>{{ __('messages.download_complete') }}</b>
+                <a class="btn btn-success" id="saveBtn" href="#" download>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                    <span>{{ __('messages.save_file') }}</span> <small id="fsize" style="opacity:.8;direction:ltr"></small>
+                </a>
+                <button type="button" class="btn btn-soft" id="againBtn">{{ __('messages.download_another') }}</button>
+            </div>
+        </section>
+    </main>
+
+    <div class="grid4">
+        <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><b>{{ __('messages.feat_fast') }}</b><span>{{ __('messages.feat_fast_desc') }}</span></div>
+        <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><b>{{ __('messages.feat_safe') }}</b><span>{{ __('messages.feat_safe_desc') }}</span></div>
+        <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/></svg></div><b>{{ __('messages.feat_free') }}</b><span>{{ __('messages.feat_free_desc') }}</span></div>
+        <div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 15V9l3 3 3-3v6M17 9v6"/></svg></div><b>{{ __('messages.feat_hd') }}</b><span>{{ __('messages.feat_hd_desc') }}</span></div>
     </div>
 
-    <!-- MAIN CARD -->
-    <div class="card">
-
-        <!-- Alerts -->
-        <div id="alertSuccess" class="alert alert-success">
-            <span class="alert-icon">✓</span>
-            <span id="alertSuccessText"></span>
-        </div>
-        <div id="alertError" class="alert alert-error">
-            <span class="alert-icon">✕</span>
-            <span id="alertErrorText"></span>
-        </div>
-        <div id="alertWarning" class="alert alert-warning">
-            <span class="alert-icon">⚠</span>
-            <span id="alertWarningText"></span>
-        </div>
-        <div id="alertInfo" class="alert alert-info">
-            <span class="alert-icon">ℹ</span>
-            <span id="alertInfoText"></span>
-        </div>
-
-        <!-- URL Input -->
-        <div class="input-section">
-            <label class="input-label" for="videoUrl">{{ __('messages.input_url') }}</label>
-            <div class="input-wrapper">
-                <input
-                    type="text"
-                    id="videoUrl"
-                    class="url-input"
-                    placeholder="{{ __('messages.input_placeholder') }}"
-                    autocomplete="off"
-                    spellcheck="false"
-                >
-                <button class="btn-paste" id="pasteBtn" title="{{ __('messages.paste_button') }}">
-                    📋 {{ __('messages.paste_button') }}
-                </button>
-            </div>
-        </div>
-
-        <!-- Analyze Button -->
-        <button class="btn btn-primary" id="analyzeBtn">
-            🔍 {{ __('messages.analyze_button') }}
-        </button>
-
-        <!-- Loading Bar -->
-        <div class="loading-bar-wrap" id="loadingBar">
-            <div class="loading-text" id="loadingText">{{ __('messages.analyzing') }}</div>
-            <div class="loading-bar"><div class="loading-bar-inner"></div></div>
-        </div>
-
-        <!-- Video Info Section -->
-        <div id="videoInfo">
-            <div class="divider"></div>
-
-            <!-- Thumbnail -->
-            <div class="thumbnail-wrap">
-                <img id="vThumb" src="" alt="thumbnail">
-                <div class="thumbnail-overlay"></div>
-                <div class="duration-badge" id="vDuration"></div>
-            </div>
-
-            <!-- Meta -->
-            <div class="video-meta">
-                <div class="video-meta-title" id="vTitle"></div>
-                <div class="video-meta-sub" id="vUploader"></div>
-            </div>
-
-            <!-- Qualities -->
-            <div class="quality-label">{{ __('messages.available_qualities') }}</div>
-            <div class="quality-grid" id="qualityGrid"></div>
-
-            <!-- Download & Back -->
-            <div class="action-row">
-                <button class="btn btn-secondary" id="backBtn">
-                    ↩ {{ __('messages.back_button') }}
-                </button>
-                <button class="btn btn-success" id="downloadBtn" disabled>
-                    ⬇ {{ __('messages.download_button') }}
-                </button>
-            </div>
-        </div>
-    </div>
-    <!-- FOOTER -->
-    <div class="footer">
-        <p>{{ __('messages.footer_text') }}</p>
-        <p style="margin-bottom: 0;">{{ __('messages.footer_note') }}</p>
+    <h3 class="h">{{ __('messages.how_title') }}</h3>
+    <div class="steps">
+        <div class="step"><div class="n">1</div><p>{{ __('messages.how_1') }}</p></div>
+        <div class="step"><div class="n">2</div><p>{{ __('messages.how_2') }}</p></div>
+        <div class="step"><div class="n">3</div><p>{{ __('messages.how_3') }}</p></div>
     </div>
 
+    @include('ads.slot', ['slot' => config('ads.adsense_slot_bottom'), 'custom' => false])
+
+    <h3 class="h">{{ __('messages.faq_title') }}</h3>
+    <details><summary>{{ __('messages.faq_q1') }}</summary><p>{{ __('messages.faq_a1') }}</p></details>
+    <details><summary>{{ __('messages.faq_q2') }}</summary><p>{{ __('messages.faq_a2') }}</p></details>
+    <details><summary>{{ __('messages.faq_q3') }}</summary><p>{{ __('messages.faq_a3') }}</p></details>
+@endsection
+
+@section('scripts')
 <script>
-    const CSRF   = document.querySelector('meta[name="csrf-token"]').content;
-    const API    = '/api';
+(() => {
+    const T = {!! json_encode([
+        'analyze'      => __('messages.analyze_button'),
+        'analyzing'    => __('messages.analyzing'),
+        'download'     => __('messages.download_button'),
+        'starting'     => __('messages.starting'),
+        'downloading'  => __('messages.downloading'),
+        'processing'   => __('messages.processing'),
+        'fetchFailed'  => __('messages.video_fetch_failed'),
+        'dlFailed'     => __('messages.download_failed'),
+        'pasteWarn'    => __('messages.paste_warning'),
+        'enterUrl'     => __('messages.input_url'),
+        'network'      => __('messages.network_error'),
+        'audio'        => __('messages.audio_only'),
+        'ready'        => __('messages.download_ready'),
+    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) !!};
+    const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+    const $ = id => document.getElementById(id);
 
-    let currentUrl    = null;
-    let selectedFmt   = null;
+    let current = null;   // { url, data }
+    let selected = null;  // format object
+    let pollTimer = null;
 
-    const $  = id => document.getElementById(id);
+    // ── helpers ───────────────────────────────────
+    function alertMsg(type, msg) {
+        const el = $('alert');
+        el.className = 'alert show ' + type;
+        el.textContent = msg;
+    }
+    function clearAlert() { $('alert').className = 'alert'; }
 
-    // ── Alerts ──────────────────────────────────────
-    function showAlert(type, msg) {
-        ['Success','Error','Warning','Info'].forEach(t => {
-            $('alert' + t).classList.remove('show');
-        });
-        const cap = type.charAt(0).toUpperCase() + type.slice(1);
-        $('alert' + cap + 'Text').textContent = msg;
-        $('alert' + cap).classList.add('show');
-        if (type !== 'error') {
-            setTimeout(() => $('alert' + cap).classList.remove('show'), 6000);
+    function fmtDuration(s) {
+        s = Math.floor(s || 0); if (!s) return '';
+        const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+        return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+    }
+    function fmtBytes(b) {
+        if (!b) return '';
+        const u = ['B', 'KB', 'MB', 'GB']; let i = 0;
+        while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+        return b.toFixed(i > 1 ? 1 : 0) + ' ' + u[i];
+    }
+
+    function setBusy(btn, busy, label) {
+        btn.disabled = busy;
+        const span = btn.querySelector('span');
+        if (busy) {
+            btn.dataset.html = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner"></span>';
+            const s = document.createElement('span'); s.textContent = label; btn.appendChild(s);
+        } else if (btn.dataset.html) {
+            btn.innerHTML = btn.dataset.html;
         }
     }
-    function clearAlerts() {
-        ['Success','Error','Warning','Info'].forEach(t => {
-            $('alert' + t).classList.remove('show');
+
+    async function api(method, path, body) {
+        const res = await fetch(path, {
+            method,
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+            credentials: 'same-origin',
+            body: body ? JSON.stringify(body) : undefined,
         });
+        let data = {};
+        try { data = await res.json(); } catch (e) {}
+        if (res.status === 419) { location.reload(); throw new Error('expired'); }
+        if (!res.ok || data.success === false) {
+            const msg = data.message || (data.errors && Object.values(data.errors)[0][0]) || T.fetchFailed;
+            throw new Error(msg);
+        }
+        return data;
     }
 
-    // ── Loading ──────────────────────────────────────
-    function setLoading(show, text = '{{ __("messages.analyzing") }}') {
-        $('loadingBar').classList.toggle('show', show);
-        $('loadingText').textContent = text;
-        $('analyzeBtn').disabled = show;
+    function resetView() {
+        clearInterval(pollTimer);
+        $('result').classList.remove('show');
+        $('picker').style.display = '';
+        $('progress').classList.remove('show');
+        $('done').classList.remove('show');
+        selected = null;
+        $('dlBtn').disabled = true;
     }
 
-    // ── Format duration ──────────────────────────────
-    function fmtDuration(sec) {
-        if (!sec) return '';
-        const h = Math.floor(sec / 3600);
-        const m = Math.floor((sec % 3600) / 60);
-        const s = Math.floor(sec % 60);
-        if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-        return `${m}:${String(s).padStart(2,'0')}`;
-    }
-
-    // ── Paste from clipboard ─────────────────────────
+    // ── paste ─────────────────────────────────────
     $('pasteBtn').addEventListener('click', async () => {
         try {
-            const text = await navigator.clipboard.readText();
-            if (text) {
-                $('videoUrl').value = text.trim();
-                $('videoUrl').focus();
-                analyzeVideo();
-            }
-        } catch {
-            showAlert('warning', '{{ __("messages.paste_warning") }}');
-        }
+            const text = (await navigator.clipboard.readText()).trim();
+            if (text) { $('url').value = text; analyze(); }
+        } catch (e) { alertMsg('warning', T.pasteWarn); $('url').focus(); }
     });
+    $('url').addEventListener('paste', () => setTimeout(() => {
+        if (/^https?:\/\//i.test($('url').value.trim())) analyze();
+    }, 50));
 
-    // ── Auto-paste on document paste event ───────────
-    document.addEventListener('paste', (e) => {
-        // Prevent auto-paste if user is already typing in an input
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-        
-        const text = (e.clipboardData || window.clipboardData).getData('text');
-        if (text && (text.includes('http://') || text.includes('https://'))) {
-            $('videoUrl').value = text.trim();
-            $('videoUrl').focus();
-            analyzeVideo();
-        }
-    });
+    // ── analyze ───────────────────────────────────
+    $('form').addEventListener('submit', e => { e.preventDefault(); analyze(); });
 
-    // ── Analyze ──────────────────────────────────────
-    $('analyzeBtn').addEventListener('click', analyzeVideo);
-    $('videoUrl').addEventListener('keydown', e => { if (e.key === 'Enter') analyzeVideo(); });
+    async function analyze() {
+        const url = $('url').value.trim();
+        if (!/^https?:\/\/\S+$/i.test(url)) { alertMsg('warning', T.enterUrl); $('url').focus(); return; }
+        if ($('analyzeBtn').disabled) return;
 
-    async function analyzeVideo() {
-        const url = $('videoUrl').value.trim();
-        if (!url) {
-            showAlert('warning', '{{ __("messages.input_url") }}');
-            return;
-        }
-
-        clearAlerts();
-        setLoading(true, '{{ __("messages.analyzing") }}');
-        $('videoInfo').classList.remove('show');
-        selectedFmt = null;
-        $('downloadBtn').disabled = true;
+        clearAlert(); resetView();
+        setBusy($('analyzeBtn'), true, T.analyzing);
+        $('skeleton').classList.add('show');
 
         try {
-            const res  = await fetch(`${API}/analyze`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
-                body: JSON.stringify({ url })
-            });
-            const data = await res.json();
-
-            if (!res.ok || !data.success) {
-                showAlert('error', data.message || '{{ __("messages.video_fetch_failed") }}');
-                return;
-            }
-
-            currentUrl = url;
-            renderVideo(data.data);
+            const res = await api('POST', '/api/analyze', { url });
+            current = { url, data: res.data };
+            render(res.data);
         } catch (e) {
-            showAlert('error', '{{ __("messages.video_fetch_failed") }}');
-            console.error(e);
+            if (e.message !== 'expired') alertMsg('error', e.message === 'Failed to fetch' ? T.network : e.message);
         } finally {
-            setLoading(false);
+            $('skeleton').classList.remove('show');
+            setBusy($('analyzeBtn'), false);
         }
     }
 
-    // ── Render video info ────────────────────────────
-    function renderVideo(v) {
-        // Thumbnail
-        const thumb = $('vThumb');
-        if (v.thumbnail) {
-            thumb.src = v.thumbnail;
-            thumb.onerror = () => { thumb.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 9%22%3E%3Crect fill=%22%231e2035%22 width=%2216%22 height=%229%22/%3E%3Ctext x=%228%22 y=%225.5%22 text-anchor=%22middle%22 fill=%22%239898b8%22 font-size=%223%22%3E🎬%3C/text%3E%3C/svg%3E'; };
-        }
-        $('vDuration').textContent = fmtDuration(v.duration);
-        $('vTitle').textContent    = v.title || '';
-        $('vUploader').textContent = v.uploader ? '📺 ' + v.uploader : '';
+    function render(v) {
+        const img = $('thumb');
+        img.hidden = !v.thumbnail;
+        if (v.thumbnail) { img.src = v.thumbnail; img.onerror = () => { img.hidden = true; }; }
+        $('dur').textContent = fmtDuration(v.duration);
+        $('dur').hidden = !v.duration;
+        $('vtitle').textContent = v.title || '';
+        $('vby').textContent = v.uploader || '';
 
-        // Quality grid
-        const grid = $('qualityGrid');
-        grid.innerHTML = '';
-
-        if (!v.formats || v.formats.length === 0) {
-            grid.innerHTML = `<p style="color:var(--text-muted);font-size:13px">{{ __('messages.no_qualities') }}</p>`;
-        } else {
-            // Group formats by type
-            const videoFormats = v.formats.filter(f => f.format === 'video');
-            const audioFormats = v.formats.filter(f => f.format === 'audio');
-
-            // Video formats
-            videoFormats.forEach(fmt => {
-                const btn = document.createElement('div');
-                btn.className = 'quality-btn';
-                btn.dataset.fmt = JSON.stringify(fmt);
-
-                let icon = '🎬';
-                let sub  = fmt.ext ? fmt.ext.toUpperCase() : 'MP4';
-                let info = '';
-
-                if (fmt.height >= 2160) { icon = '🔥'; info = '4K'; }
-                else if (fmt.height >= 1440) { icon = '✨'; info = '2K'; }
-                else if (fmt.height >= 1080) { icon = '🌟'; info = 'FHD'; }
-                else if (fmt.height >= 720) { icon = '⭐'; info = 'HD'; }
-                else if (fmt.height >= 480) { icon = '◆'; info = 'SD'; }
-                else { icon = '▪'; info = 'LQ'; }
-
-                btn.innerHTML = `
-                    <span class="q-label">${icon} ${fmt.quality}</span>
-                    <span class="q-sub">${sub}</span>
-                    ${info ? `<span class="q-info">${info}</span>` : ''}
-                `;
-
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('selected'));
-                    btn.classList.add('selected');
-                    selectedFmt = fmt;
-                    $('downloadBtn').disabled = false;
-                });
-
-                grid.appendChild(btn);
+        const grid = $('qgrid');
+        grid.replaceChildren();
+        v.formats.forEach((f, i) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'q';
+            const label = document.createElement('b');
+            label.textContent = f.type === 'audio' ? 'MP3' : f.quality + (f.fps > 30 ? f.fps : '');
+            const sub = document.createElement('small');
+            sub.textContent = f.type === 'audio' ? T.audio : (fmtBytes(f.size) || 'MP4');
+            b.append(label, sub);
+            const tagText = f.height >= 2160 ? '4K' : f.height >= 1440 ? '2K' : f.height >= 1080 ? 'FHD' : f.height >= 720 ? 'HD' : '';
+            if (tagText) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = tagText; b.appendChild(t); }
+            b.addEventListener('click', () => {
+                grid.querySelectorAll('.q').forEach(x => x.classList.remove('sel'));
+                b.classList.add('sel');
+                selected = f;
+                $('dlBtn').disabled = false;
             });
+            grid.appendChild(b);
+            // preselect best ≤1080p video for convenience
+            if (!selected && f.type === 'video' && (f.height <= 1080)) b.click();
+        });
+        if (!selected && grid.firstChild) grid.firstChild.click();
 
-            // Audio formats
-            audioFormats.forEach(fmt => {
-                const btn = document.createElement('div');
-                btn.className = 'quality-btn audio-btn';
-                btn.dataset.fmt = JSON.stringify(fmt);
-
-                const sub = fmt.ext ? fmt.ext.toUpperCase() : 'MP3';
-                btn.innerHTML = `
-                    <span class="q-label">🎵 ${fmt.quality}</span>
-                    <span class="q-sub">${sub}</span>
-                    <span class="q-info">Audio</span>
-                `;
-
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('selected'));
-                    btn.classList.add('selected');
-                    selectedFmt = fmt;
-                    $('downloadBtn').disabled = false;
-                });
-
-                grid.appendChild(btn);
-            });
-        }
-
-        $('videoInfo').classList.add('show');
+        $('result').classList.add('show');
+        $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    // ── Download ─────────────────────────────────────
-    $('downloadBtn').addEventListener('click', async () => {
-        if (!selectedFmt || !currentUrl) {
-            showAlert('warning', '{{ __("messages.select_quality") }}');
-            return;
-        }
-
-        // Prevent double-click
-        if ($('downloadBtn').disabled) return;
-
-        clearAlerts();
-        const origText = $('downloadBtn').innerHTML;
-        $('downloadBtn').disabled = true;
-        $('downloadBtn').innerHTML = '⏳ {{ __("messages.downloading") }}...';
-        setLoading(true, '{{ __("messages.downloading") }}');
-
+    // ── download ──────────────────────────────────
+    $('dlBtn').addEventListener('click', async () => {
+        if (!selected || !current) return;
+        clearAlert();
+        setBusy($('dlBtn'), true, T.starting);
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
-
-            const res = await fetch(`${API}/download`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
-                body: JSON.stringify({
-                    url:       currentUrl,
-                    format_id: selectedFmt.id,
-                    quality:   selectedFmt.quality
-                }),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-            const data = await res.json();
-
-            if (!res.ok || !data.success) {
-                showAlert('error', data.message || '{{ __("messages.download_failed") }}');
-                $('downloadBtn').disabled = false;
-                $('downloadBtn').innerHTML = origText;
-                return;
-            }
-
-            showAlert('success', '{{ __("messages.download_ready") }}');
-
-            // Build HTTPS download URL from browser's own origin
-            const filePath = data.file_path || data.download_url || '';
-            const dlUrl = filePath.startsWith('http')
-                ? filePath
-                : window.location.origin + filePath;
-
-            // Remove any previous fallback button
-            const existingBtn = document.getElementById('fallbackDownloadBtn');
-            if (existingBtn) existingBtn.remove();
-
-            // Method 1: Direct anchor click (works on Desktop + Android Chrome)
-            // Do NOT use target='_blank' — iOS Safari blocks it and Android doesn't need it
-            const a = document.createElement('a');
-            a.href     = dlUrl;
-            a.download = data.filename || 'video.mp4';
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-
-            // Clean up after a moment
-            setTimeout(() => {
-                document.body.removeChild(a);
-            }, 1000);
-
-            // Method 2: Show persistent download link for iOS Safari / Firefox mobile
-            // These browsers often ignore programmatic clicks — user must tap manually
-            const fallbackBtn = document.createElement('a');
-            fallbackBtn.id        = 'fallbackDownloadBtn';
-            fallbackBtn.href      = dlUrl;
-            fallbackBtn.download  = data.filename || 'video.mp4';
-            fallbackBtn.className = 'btn btn-success';
-            fallbackBtn.style.cssText = 'margin-top:14px;display:flex;text-decoration:none;';
-            fallbackBtn.innerHTML = '💾 {{ __("messages.download_button") }} / Save Video';
-            // Do NOT set target='_blank' — it breaks downloads on iOS Safari
-            $('downloadBtn').parentElement.appendChild(fallbackBtn);
-
-            // Re-enable download button
-            setTimeout(() => {
-                $('downloadBtn').disabled = false;
-                $('downloadBtn').innerHTML = origText;
-            }, 3000);
-
+            const res = await api('POST', '/api/download', { url: current.url, format_id: selected.id });
+            $('picker').style.display = 'none';
+            showProgress({ status: 'queued', progress: 0 });
+            $('progress').classList.add('show');
+            poll(res.job_id);
         } catch (e) {
-            if (e.name === 'AbortError') {
-                showAlert('error', '{{ __("messages.download_failed") }} (timeout)');
-            } else {
-                showAlert('error', '{{ __("messages.download_failed") }}');
-            }
-            $('downloadBtn').disabled = false;
-            $('downloadBtn').innerHTML = origText;
-            console.error(e);
+            if (e.message !== 'expired') alertMsg('error', e.message);
         } finally {
-            setLoading(false);
+            setBusy($('dlBtn'), false);
         }
     });
 
-    // ── Back button ───────────────────────────────────
-    $('backBtn').addEventListener('click', () => {
-        $('videoInfo').classList.remove('show');
-        $('videoUrl').value = '';
-        currentUrl  = null;
-        selectedFmt = null;
-        $('downloadBtn').disabled = true;
-        clearAlerts();
-    });
+    function showProgress(s) {
+        const bar = $('bar');
+        const pct = Math.max(0, Math.min(100, s.progress || 0));
+        bar.classList.toggle('indeterminate', s.status === 'queued' || (s.status === 'downloading' && pct === 0) || s.status === 'processing');
+        bar.firstElementChild.style.width = pct + '%';
+        $('ppct').textContent = s.status === 'processing' ? '' : pct + '%';
+        $('pstatus').textContent = s.status === 'processing' ? T.processing : (s.status === 'queued' ? T.starting : T.downloading);
+        $('pspeed').textContent = s.speed ? fmtBytes(s.speed) + '/s' : '';
+        $('peta').textContent = s.eta ? fmtDuration(s.eta) : '';
+    }
+
+    function poll(id) {
+        let failures = 0;
+        clearInterval(pollTimer);
+        pollTimer = setInterval(async () => {
+            try {
+                const s = await api('GET', '/api/status/' + id);
+                failures = 0;
+                if (s.status === 'done') {
+                    clearInterval(pollTimer);
+                    finish(s);
+                } else if (s.status === 'error') {
+                    clearInterval(pollTimer);
+                    $('progress').classList.remove('show');
+                    $('picker').style.display = '';
+                    alertMsg('error', s.error || T.dlFailed);
+                } else {
+                    showProgress(s);
+                }
+            } catch (e) {
+                if (++failures >= 8) {
+                    clearInterval(pollTimer);
+                    $('progress').classList.remove('show');
+                    $('picker').style.display = '';
+                    alertMsg('error', T.dlFailed);
+                }
+            }
+        }, 1200);
+    }
+
+    function finish(s) {
+        $('progress').classList.remove('show');
+        const href = new URL(s.file_url, location.origin).href;
+        $('saveBtn').href = href;
+        $('fsize').textContent = s.size ? '(' + fmtBytes(s.size) + ')' : '';
+        $('done').classList.add('show');
+        alertMsg('success', T.ready);
+        // auto-start the download; the button stays for iOS / blocked downloads
+        const a = document.createElement('a');
+        a.href = href; a.download = ''; a.style.display = 'none';
+        document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    $('backBtn').addEventListener('click', () => { resetView(); clearAlert(); $('url').value = ''; $('url').focus(); });
+    $('againBtn').addEventListener('click', () => { resetView(); clearAlert(); $('url').value = ''; $('url').focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+})();
 </script>
-</body>
-</html>
+@endsection

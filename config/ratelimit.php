@@ -1,6 +1,8 @@
 <?php
 
+// Requests per minute, per visitor IP
 return [
-    'rate_limit' => env('RATE_LIMIT', 30),
-    'rate_limit_period' => env('RATE_LIMIT_PERIOD', 60),
+    'analyze'  => (int) env('RATE_LIMIT_ANALYZE', 15),
+    'download' => (int) env('RATE_LIMIT_DOWNLOAD', 8),
+    'status'   => (int) env('RATE_LIMIT_STATUS', 120),
 ];

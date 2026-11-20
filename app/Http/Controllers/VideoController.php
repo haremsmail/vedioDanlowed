@@ -1,270 +1,177 @@
 <?php
-/*
-Full File Purpose
 
-This controller does 4 main jobs:
-
-Show homepage
-Analyze video URL
-Download video
-Send downloaded file to browser
-
-
-*/
 namespace App\Http\Controllers;
 
 use App\Services\YtDlpService;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log;
 use Exception;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
+/**
+ * Flow:
+ *  1. POST /api/analyze          → video info + list of qualities
+ *  2. POST /api/download         → starts a background job, returns job id
+ *  3. GET  /api/status/{id}      → progress (polled by the browser)
+ *  4. GET  /download/{id}        → the finished file
+ */
 class VideoController extends Controller
 {
-    private YtDlpService $ytDlpService;
+    public function __construct(private YtDlpService $ytDlp) {}
 
-    public function __construct(YtDlpService $ytDlpService)
-    {
-        $this->ytDlpService = $ytDlpService;
-    }
-
-    /**
-     * Index page
-     */
     public function index()
     {
         return view('index');
     }
 
-    /**
-     * Analyze video from URL
-     * POST /api/analyze
-     */
     public function analyze(Request $request): JsonResponse
     {
-        try {
-            $validated = $request->validate([
-                'url' => 'required|string|max:2048',
-            ]);
+        $validated = $request->validate([
+            'url' => 'required|string|url:http,https|max:2048',
+        ]);
+        $url = trim($validated['url']);
 
-            $url = $validated['url'];
-
-            // Check if URL is from supported platform
-            if (!$this->ytDlpService->isSupportedPlatform($url)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => __('messages.unsupported_platform'),
-                ], 400);
-            }
-
-            // Analyze video
-            $videoData = $this->ytDlpService->analyzeVideo($url);
-
-            return response()->json([
-                'success' => true,
-                'data'    => $videoData,
-            ]);
-        } catch (Exception $e) {
-            Log::error('Analyze error', [
-                'error' => $e->getMessage(),
-                'url'   => $url ?? 'unknown',
-                'ip'    => $request->ip(),
-            ]);
-            
-            // Generic error message in production
-            $message = config('app.debug')
-                ? $e->getMessage()
-                : __('messages.video_fetch_failed');
-            
-            return response()->json([
-                'success' => false,
-                'message' => $message,
-            ], 400);
+        if (!$this->ytDlp->isSupportedPlatform($url)) {
+            return $this->fail(__('messages.unsupported_platform'));
         }
+
+        try {
+            $data = $this->ytDlp->analyzeVideo($url);
+        } catch (Exception $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        // Remember which URL this visitor analyzed, so /download can't be
+        // used to fetch arbitrary URLs without going through validation.
+        $request->session()->put('analyzed.' . sha1($url), [
+            'title'   => $data['title'],
+            'formats' => array_column($data['formats'], 'type', 'id'),
+        ]);
+
+        return response()->json(['success' => true, 'data' => $data]);
     }
 
-    /**
-     * Download video synchronously and return a direct download URL
-     * POST /api/download
-     */
     public function download(Request $request): JsonResponse
     {
-        try {
-            $validated = $request->validate([
-                'url'       => 'required|string|max:2048',
-                'format_id' => 'required|string|max:100',
-                'quality'   => 'required|string|max:50',
-            ]);
+        $validated = $request->validate([
+            'url'       => 'required|string|url:http,https|max:2048',
+            'format_id' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9_.\-]+(\+[A-Za-z0-9_.\-]+)?$/'],
+        ]);
+        $url = trim($validated['url']);
 
-            $url      = $validated['url'];
-            $formatId = $validated['format_id'];
-            $quality  = $validated['quality'];
-
-            // Check platform
-            if (!$this->ytDlpService->isSupportedPlatform($url)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => __('messages.unsupported_platform'),
-                ], 400);
-            }
-
-            // Validate format_id (prevent injection) — allow + for merged formats like "137+140"
-            if (!preg_match('/^[a-zA-Z0-9_+\-]+$/', $formatId)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => __('messages.invalid_format'),
-                ], 400);
-            }
-
-            // Download synchronously
-            $result = $this->ytDlpService->downloadVideo($url, $formatId);
-            $filename = basename($result['file']);
-
-            return response()->json([
-                'success'      => true,
-                'message'      => __('messages.download_ready'),
-                // Return ONLY the relative path — the browser will prepend its own origin
-                // This guarantees https:// when the user is on https:// (Railway, etc.)
-                'file_path'    => '/download/' . rawurlencode($filename),
-                'filename'     => $filename,
-                // Keep download_url for backwards compatibility (will be overridden by JS)
-                'download_url' => '/download/' . rawurlencode($filename),
-            ]);
-        } catch (Exception $e) {
-            Log::error('Download error', [
-                'error'    => $e->getMessage(),
-                'url'      => $url ?? 'unknown',
-                'format'   => $formatId ?? 'unknown',
-                'ip'       => $request->ip(),
-            ]);
-            
-            // Generic error message in production
-            $message = config('app.debug')
-                ? $e->getMessage()
-                : __('messages.download_failed');
-            
-            return response()->json([
-                'success' => false,
-                'message' => $message,
-            ], 400);
+        $analyzed = $request->session()->get('analyzed.' . sha1($url));
+        if (!$analyzed || !isset($analyzed['formats'][$validated['format_id']])) {
+            return $this->fail(__('messages.invalid_format'));
         }
+
+        if (!$this->ytDlp->isSupportedPlatform($url)) {
+            return $this->fail(__('messages.unsupported_platform'));
+        }
+
+        $ipHash = hash_hmac('sha256', (string) $request->ip(), (string) config('app.key'));
+        $active = $this->ytDlp->countActiveJobs($ipHash);
+
+        if ($active['ip'] >= (int) config('ytdlp.max_concurrent_per_ip', 1)) {
+            return $this->fail(__('messages.one_at_a_time'), 429);
+        }
+        if ($active['total'] >= (int) config('ytdlp.max_concurrent', 3)) {
+            return $this->fail(__('messages.server_busy'), 503);
+        }
+
+        try {
+            $job = $this->ytDlp->createJob(
+                $url,
+                $validated['format_id'],
+                $analyzed['formats'][$validated['format_id']],
+                $analyzed['title'],
+                $ipHash,
+            );
+        } catch (Exception $e) {
+            Log::error('Could not start download job', ['error' => $e->getMessage()]);
+            return $this->fail(__('messages.download_failed'), 500);
+        }
+
+        // Only this browser session may read/download this job
+        $request->session()->push('jobs', $job['id']);
+
+        return response()->json(['success' => true, 'job_id' => $job['id']]);
     }
 
-    /**
-     * Serve the downloaded file to the browser
-     * GET /download/{file}
-     *
-     * Uses StreamedResponse for memory-efficient large-file delivery.
-     * Supports HTTP Range requests so mobile browsers can resume interrupted downloads.
-     */
-    public function downloadFile(Request $request, string $file)
+    public function status(Request $request, string $id): JsonResponse
     {
-        try {
-            // Decode URL-encoding so filenames with special chars work
-            $file = rawurldecode($file);
-
-            // Prevent directory traversal
-            if (str_contains($file, '..') || str_contains($file, '/') || str_contains($file, '\\')) {
-                abort(400, __('messages.invalid_file'));
-            }
-
-            // Only allow files matching our secure naming pattern
-            if (!preg_match('/^v_[a-f0-9]{32}\.[a-z0-9]{2,5}$/', $file)) {
-                abort(400, __('messages.invalid_file'));
-            }
-
-            $filePath = $this->ytDlpService->getDownloadsPath() . DIRECTORY_SEPARATOR . $file;
-
-            if (!file_exists($filePath)) {
-                abort(404, __('messages.file_not_found'));
-            }
-
-            $fileSize = filesize($filePath);
-
-            // Proper MIME type for mobile browsers
-            $ext  = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            $mime = match($ext) {
-                'mp4'  => 'video/mp4',
-                'webm' => 'video/webm',
-                'mkv'  => 'video/x-matroska',
-                'm4a'  => 'audio/mp4',
-                'mp3'  => 'audio/mpeg',
-                'ogg'  => 'audio/ogg',
-                'wav'  => 'audio/wav',
-                default => 'application/octet-stream',
-            };
-
-            $encodedName = rawurlencode($file);
-
-            // ── Handle HTTP Range requests (mobile resume support) ──
-            $start  = 0;
-            $end    = $fileSize - 1;
-            $status = 200;
-            $headers = [
-                'Content-Type'        => $mime,
-                'Content-Disposition' => "attachment; filename=\"{$file}\"; filename*=UTF-8''{$encodedName}",
-                'Accept-Ranges'       => 'bytes',
-                'Cache-Control'       => 'no-cache, no-store, must-revalidate',
-                'Pragma'              => 'no-cache',
-                'Expires'             => '0',
-                'X-Content-Type-Options' => 'nosniff',
-            ];
-
-            if ($request->hasHeader('Range')) {
-                $range = $request->header('Range');
-                if (preg_match('/bytes=(\d+)-(\d*)/', $range, $matches)) {
-                    $start = (int) $matches[1];
-                    $end   = !empty($matches[2]) ? (int) $matches[2] : $fileSize - 1;
-
-                    if ($start > $end || $start >= $fileSize) {
-                        return response('', 416, [
-                            'Content-Range' => "bytes */{$fileSize}",
-                        ]);
-                    }
-
-                    $status = 206;
-                    $headers['Content-Range']  = "bytes {$start}-{$end}/{$fileSize}";
-                }
-            }
-
-            $length = $end - $start + 1;
-            $headers['Content-Length'] = $length;
-
-            // Stream the file without loading it all into memory
-            return response()->stream(function () use ($filePath, $start, $length) {
-                $handle = fopen($filePath, 'rb');
-                if ($handle === false) {
-                    return;
-                }
-
-                if ($start > 0) {
-                    fseek($handle, $start);
-                }
-
-                $remaining = $length;
-                $chunkSize = 8192; // 8KB chunks
-
-                while ($remaining > 0 && !feof($handle)) {
-                    $read = min($chunkSize, $remaining);
-                    $data = fread($handle, $read);
-                    if ($data === false) {
-                        break;
-                    }
-                    echo $data;
-                    $remaining -= strlen($data);
-
-                    if (connection_aborted()) {
-                        break;
-                    }
-                    flush();
-                }
-
-                fclose($handle);
-            }, $status, $headers);
-
-        } catch (Exception $e) {
-            Log::error('File download error', ['error' => $e->getMessage()]);
-            abort(500, __('messages.download_failed'));
+        $job = $this->ownedJob($request, $id);
+        if (!$job) {
+            return $this->fail(__('messages.download_not_found'), 404);
         }
+
+        // Worker died without reporting (e.g. server restart)
+        if (in_array($job['status'], ['queued', 'downloading', 'processing'], true)
+            && time() - (int) $job['updated_at'] > 90) {
+            $job['status'] = 'error';
+            $job['error']  = __('messages.download_failed');
+        }
+
+        return response()->json([
+            'success'  => true,
+            'status'   => $job['status'],
+            'progress' => (int) $job['progress'],
+            'speed'    => $job['speed'],
+            'eta'      => $job['eta'],
+            'size'     => $job['size'],
+            'error'    => $job['status'] === 'error' ? $job['error'] : null,
+            'file_url' => $job['status'] === 'done' ? route('video.download.file', ['id' => $job['id']], false) : null,
+        ]);
+    }
+
+    public function downloadFile(Request $request, string $id)
+    {
+        $job = $this->ownedJob($request, $id);
+        if (!$job || $job['status'] !== 'done' || empty($job['file'])) {
+            abort(404);
+        }
+
+        $file = basename($job['file']);
+        $path = $this->ytDlp->getDownloadsPath() . DIRECTORY_SEPARATOR . $file;
+        if (!preg_match('/^v_[a-f0-9]{32}\.[a-z0-9]{2,5}$/', $file) || !is_file($path)) {
+            abort(404, __('messages.file_not_found'));
+        }
+
+        $ext  = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'mp4'  => 'video/mp4',
+            'webm' => 'video/webm',
+            'mkv'  => 'video/x-matroska',
+            'm4a'  => 'audio/mp4',
+            'mp3'  => 'audio/mpeg',
+            'ogg', 'opus' => 'audio/ogg',
+            default => 'application/octet-stream',
+        };
+
+        // Readable file name from the video title
+        $title = preg_replace('/[^\p{L}\p{N}\s\-_.()]+/u', '', (string) $job['title']);
+        $title = trim(preg_replace('/\s+/u', ' ', $title)) ?: 'video';
+        $name  = Str::limit($title, 80, '') . '.' . $ext;
+
+        // BinaryFileResponse: efficient streaming + HTTP Range (resume) support
+        return response()->download($path, $name, [
+            'Content-Type'           => $mime,
+            'Cache-Control'          => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    private function ownedJob(Request $request, string $id): ?array
+    {
+        if (!$this->ytDlp->isValidJobId($id) || !in_array($id, (array) $request->session()->get('jobs', []), true)) {
+            return null;
+        }
+
+        return $this->ytDlp->readJob($id);
+    }
+
+    private function fail(string $message, int $status = 422): JsonResponse
+    {
+        return response()->json(['success' => false, 'message' => $message], $status);
     }
 }

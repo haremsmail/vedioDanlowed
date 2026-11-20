@@ -1,77 +1,36 @@
-﻿FROM php:8.2-cli
+﻿FROM php:8.3-cli
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpng-dev \
-    libjpeg62-turbo-dev \
-    libfreetype6-dev \
-    libpq-dev \
-    libsqlite3-dev \
-    libzip-dev \
-    zip \
-    unzip \
-    git \
-    curl \
-    ffmpeg \
-    python3 \
-    python3-pip \
-    python3-venv \
+# System packages: ffmpeg (merge video+audio, MP3), python (yt-dlp)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg python3 python3-venv ca-certificates curl unzip git \
+        libzip-dev libsqlite3-dev libicu-dev \
+    && docker-php-ext-install -j"$(nproc)" pdo_sqlite zip intl opcache pcntl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp (latest version via pip)
-RUN python3 -m venv /opt/ytdlp-venv \
-    && /opt/ytdlp-venv/bin/pip install --no-cache-dir yt-dlp \
-    && ln -s /opt/ytdlp-venv/bin/yt-dlp /usr/local/bin/yt-dlp
+# Deno = JavaScript runtime that yt-dlp needs for YouTube (without it YouTube downloads fail)
+COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
 
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        gd \
-        pdo_sqlite \
-        pdo_pgsql \
-        pdo_mysql \
-        bcmath \
-        zip \
-        opcache
+# yt-dlp (+ curl-cffi browser impersonation, helps TikTok / Instagram / Facebook)
+RUN python3 -m venv /opt/ytdlp \
+    && /opt/ytdlp/bin/pip install --no-cache-dir --upgrade "yt-dlp[default,curl-cffi]" \
+    && ln -s /opt/ytdlp/bin/yt-dlp /usr/local/bin/yt-dlp
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# PHP tuning (opcache = much faster page loads)
+COPY docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
 
-# Force cache bust for fresh build without old cached layers
-ARG CACHE_BUST=20261004-v6
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Copy composer files first to guarantee clean dependency resolution
 COPY composer.json composer.lock ./
+RUN composer install --no-interaction --no-dev --no-scripts --no-autoloader --prefer-dist
 
-# Install production dependencies directly from lock file (clean build)
-RUN composer install --no-interaction --optimize-autoloader --no-dev --no-scripts
-
-# Copy project files
 COPY . .
+RUN composer dump-autoload --optimize --no-dev \
+    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views \
+                storage/logs storage/downloads storage/app/jobs bootstrap/cache database \
+    && sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh \
+    && chown -R www-data:www-data storage bootstrap/cache database
 
-# Complete composer dump-autoload cleanly without any dev packages
-RUN composer dump-autoload --optimize --no-dev
-
-# Create required storage directories
-RUN mkdir -p storage/framework/{cache/data,sessions,views,testing} \
-    && mkdir -p storage/logs \
-    && mkdir -p storage/downloads \
-    && mkdir -p bootstrap/cache \
-    && mkdir -p database
-
-# Fix line endings if written on Windows and ensure executable permissions
-RUN sed -i 's/\r$//' docker-entrypoint.sh \
-    && chmod +x docker-entrypoint.sh
-
-# Set permissions
-RUN chmod -R 777 /app/storage /app/bootstrap/cache /app/database
-
-# Expose port (Railway sets PORT env variable)
 EXPOSE 8000
-
-# Run entrypoint script
 CMD ["./docker-entrypoint.sh"]
